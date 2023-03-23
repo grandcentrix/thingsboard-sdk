@@ -1,0 +1,307 @@
+#include "thingsboard.h"
+
+#include <string.h>
+
+#include <kernel.h>
+#include <net/coap.h>
+#include <thingsboard_attr_parser.h>
+#include <modem/at_cmd_parser.h>
+#include <modem/at_params.h>
+#include <modem/lte_lc.h>
+#include <modem/modem_info.h>
+
+#include "coap_client.h"
+#include "tb_fota.h"
+
+#include <logging/log.h>
+LOG_MODULE_REGISTER(thingsboard_client);
+
+static struct {
+	int64_t tb_time; // actual Unix timestamp in ms
+	int64_t own_time; // uptime when receiving timestamp in ms
+	int64_t last_request; // uptime when time was last requested in ms
+} tb_time;
+
+K_SEM_DEFINE(time_sem, 0, 1);
+
+static attr_write_callback attribute_cb;
+
+#define TIME_RETRY_INTERVAL 10000U
+#define TIME_REFRESH_INTERVAL 3600000U
+
+static void time_worker(struct k_work *work);
+
+K_WORK_DELAYABLE_DEFINE(work_time, time_worker);
+
+static const char *access_token = CONFIG_THINGSBOARD_ACCESS_TOKEN;
+
+static int client_handle_telemetry_response(const struct coap_packet *response, struct coap_reply *reply, const struct sockaddr *from) {
+	ARG_UNUSED(response);
+	ARG_UNUSED(reply);
+	ARG_UNUSED(from);
+
+	coap_reply_clear(reply);
+
+	return 0;
+}
+
+static int client_handle_attribute_notification(const struct coap_packet *response, struct coap_reply *reply, const struct sockaddr *from)
+{
+	ARG_UNUSED(reply);
+	ARG_UNUSED(from);
+
+	LOG_INF("%s", __func__);
+
+	uint8_t *payload;
+	uint16_t payload_len;
+	struct thingsboard_attr attr = {0};
+	int err;
+
+	LOG_INF("%s", __func__);
+
+	payload = (uint8_t*)coap_packet_get_payload(response, &payload_len);
+	if (!payload_len) {
+		LOG_WRN("Received empty attributes");
+		return -ENOMSG;
+	}
+	LOG_HEXDUMP_DBG(payload, payload_len, "Received attributes");
+
+	err = thingsboard_attr_from_json(payload, payload_len, &attr);
+	if (err < 0) {
+		LOG_ERR("Parsing attributes failed");
+		return err;
+	}
+
+	thingsboard_check_fw_attributes(&attr);
+
+	if (attribute_cb) {
+		attribute_cb(&attr);
+	}
+
+	return 0;
+}
+
+static int client_handle_time_response(const struct coap_packet *response, struct coap_reply *reply, const struct sockaddr *from)
+{
+	ARG_UNUSED(from);
+
+	int64_t ts = 0;
+	const uint8_t *payload;
+	uint16_t payload_len;
+
+	LOG_INF("%s", __func__);
+
+	payload = coap_packet_get_payload(response, &payload_len);
+	if (!payload_len) {
+		LOG_WRN("Received empty timestamp");
+		return -ENOMSG;
+	}
+
+	coap_reply_clear(reply);
+
+	/* Response is not zero terminated, so it's probably simpler to just parse that ourselves */
+	for (int i = 0; i < payload_len; i++) {
+		char next = payload[i];
+		if (next < '0' || next > '9') {
+			break;
+		}
+		ts = ts * 10 + (next - '0');
+	}
+
+	tb_time.tb_time = ts;
+	tb_time.own_time = k_uptime_get();
+
+	k_sem_give(&time_sem);
+
+	return 0;
+}
+
+static int client_subscribe_to_attributes(void)
+{
+	int err;
+	struct coap_packet request;
+
+	err = coap_client_packet_init(&request, COAP_TYPE_CON, COAP_METHOD_GET);
+	if (err < 0) {
+		LOG_ERR("Failed to create CoAP request, %d", err);
+		return err;
+	}
+
+	err = coap_append_option_int(&request, COAP_OPTION_OBSERVE, 0);
+	if (err < 0) {
+		LOG_ERR("Failed to encode CoAP option, %d", err);
+		return err;
+	}
+
+	const uint8_t *uri[] = {"api", "v1", access_token, "attributes", NULL};
+	err = coap_packet_append_uri_path(&request, uri);
+	if (err < 0) {
+		LOG_ERR("Failed to encode uri path, %d", err);
+		return err;
+	}
+
+	err = coap_client_send(&request, client_handle_attribute_notification);
+	if (err < 0) {
+		LOG_ERR("Failed to send CoAP request, %d", errno);
+		return -errno;
+	}
+
+	LOG_INF("Attributes subscribed");
+
+	return 0;
+}
+
+static int client_request_time(void) {
+	int err;
+
+	static const char *payload = "{\"method\": \"getCurrentTime\", \"params\": {}}";
+	const uint8_t *uri[] = {"api", "v1", access_token, "rpc", NULL};
+
+	err = coap_client_make_request(uri, payload, strlen(payload), COAP_TYPE_CON, COAP_METHOD_POST, client_handle_time_response);
+	if (err) {
+		LOG_ERR("Failed to request time");
+		return err;
+	}
+
+	tb_time.last_request = k_uptime_get();
+
+	return 0;
+}
+
+static void time_worker(struct k_work *work) {
+	ARG_UNUSED(work);
+
+	int64_t since_last_request = k_uptime_get() - tb_time.last_request;
+
+	// Request is due
+	if ((!tb_time.last_request) || 
+		(since_last_request >= TIME_REFRESH_INTERVAL) ||
+		(tb_time.last_request > tb_time.own_time
+			&& since_last_request >= TIME_RETRY_INTERVAL)) {
+		client_request_time();
+	}
+
+	k_work_schedule(&work_time, K_MSEC(TIME_RETRY_INTERVAL));
+}
+
+static void modem_configure(void)
+{
+#if defined(CONFIG_LTE_LINK_CONTROL)
+	if (IS_ENABLED(CONFIG_LTE_AUTO_INIT_AND_CONNECT)) {
+		/* Do nothing, modem is already turned on
+		 * and connected.
+		 */
+	} else {
+		int err;
+
+		LOG_INF("LTE Link Connecting ...");
+		err = lte_lc_init_and_connect();
+		__ASSERT(err == 0, "LTE link could not be established.");
+		LOG_INF("LTE Link Connected!");
+	}
+#endif /* defined(CONFIG_LTE_LINK_CONTROL) */
+}
+
+int thingsboard_send_telemetry(const void *payload, size_t sz) {
+	int err;
+
+	const uint8_t *uri[] = {"api", "v1", access_token, "telemetry", NULL};
+	err = coap_client_make_request(uri, payload, sz, COAP_TYPE_CON, COAP_METHOD_POST, client_handle_telemetry_response);
+	if (err) {
+		LOG_ERR("Failed to send attributes");
+		return err;
+	}
+
+	return 0;
+}
+
+static void print_modem_info(void) {
+	char info_name[50];
+	char modem_info[50];
+	
+	enum modem_info infos[] = {
+		MODEM_INFO_FW_VERSION,
+		MODEM_INFO_UICC,
+		MODEM_INFO_IMSI,
+		MODEM_INFO_ICCID,
+		MODEM_INFO_APN,
+		MODEM_INFO_IP_ADDRESS
+	};
+
+	int ret;
+
+	for (int i = 0; i < ARRAY_SIZE(infos); i++) {
+		ret = modem_info_string_get(infos[i],
+						modem_info,
+						sizeof(modem_info));
+		if (ret < 0) {
+			return;
+		}
+		ret = modem_info_name_get(infos[i],
+						info_name);
+		if (ret < 0 || ret > sizeof(info_name)) {
+			return;
+		}
+		info_name[ret] = '\0';
+		LOG_INF("Value of %s is %s", log_strdup(info_name), log_strdup(modem_info));
+	}
+}
+
+static bool initialized;
+
+void coap_client_setup_cb(void) {
+	LOG_INF("%s", __func__);
+
+	if (!initialized) {
+		if (confirm_fw_update() != 0) {
+			LOG_ERR("Failed to confirm FW update");
+		} else {
+			initialized = true;
+		}
+	}
+
+	if (client_subscribe_to_attributes() != 0) {
+		LOG_ERR("Failed to observe attributes");
+	}
+
+	if (client_request_time() != 0) {
+		LOG_ERR("Failed to request time");
+	}
+
+	if (k_work_schedule(&work_time, K_NO_WAIT) < 0) {
+		LOG_ERR("Failed to schedule time worker!");
+	}
+}
+
+int thingsboard_init(attr_write_callback cb, const struct tb_fw_id *fw_id) {
+	attribute_cb = cb;
+	int ret;
+
+	thingsboard_fota_init(access_token, fw_id);
+
+	modem_configure();
+
+	print_modem_info();
+
+	if (coap_client_init(coap_client_setup_cb) != 0) {
+		LOG_ERR("Failed to initialize CoAP client");
+		return -1;
+	}
+
+	LOG_INF("Waiting for Timestamp...");
+	ret = k_sem_take(&time_sem, K_SECONDS(10));
+	if (ret < 0) {
+		LOG_ERR("Failed to wait for timestamp: %d", ret);
+	}
+
+	return 0;
+}
+
+time_t thingsboard_time(void) {
+	return thingsboard_time_msec() / MSEC_PER_SEC;
+}
+
+time_t thingsboard_time_msec(void) {
+	time_t result = (time_t) ((k_uptime_get() - tb_time.own_time) + tb_time.tb_time);
+	return result;
+}

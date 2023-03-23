@@ -1,0 +1,8 @@
+{
+    "type": "object",
+    "properties": {
+        "fw_title": { "type": "string" },
+        "fw_version": { "type": "string" },
+        "fw_size": { "type": "number" }
+    }
+}

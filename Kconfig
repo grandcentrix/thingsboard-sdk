@@ -1,0 +1,44 @@
+menuconfig THINGSBOARD
+    bool "Thingsboard library"
+    depends on COAP
+
+if THINGSBOARD
+
+config APP_MCUBOOT_FLASH_BUF_SZ
+    int "Size of buffer used for flash write operations during MCUboot updates"
+    depends on DFU_TARGET_MCUBOOT
+    default 4096
+    help
+      Buffer size must be aligned to the minimal flash write block size.
+
+config COAP_CLIENT_NUM_MSGS
+    int "Maximum number of CoAP messages"
+    default 10
+
+config COAP_CLIENT_MSG_LEN
+    int "Maximum length of CoAP messages"
+    default 1280
+
+config COAP_NUM_RETRIES
+    int "Number of retries for CoAP messages"
+    default 3
+
+config THINGSBOARD_ACCESS_TOKEN
+  string "Device Access Token"
+  default ""
+
+config THINGSBOARD_FOTA_CHUNK_SIZE
+    int "Chunk size for FOTA updates"
+    default 1024
+    help
+       "Must be smaller than COAP_CLIENT_MSG_LEN"
+
+config COAP_SERVER_HOSTNAME
+  string "Coap Server hostname"
+  default "10.101.45.222"
+
+config COAP_SERVER_PORT
+	int "CoAP server port"
+	default 5683
+
+endif
