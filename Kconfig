@@ -23,8 +23,18 @@ config COAP_NUM_RETRIES
     int "Number of retries for CoAP messages"
     default 3
 
+config THINGSBOARD_USE_PROVISIONING
+    bool "Provision devices"
+
+config THINGSBOARD_PROVISIONING_KEY
+    string "Provisioning key"
+
+config THINGSBOARD_PROVISIONING_SECRET
+    string "Provisioning secret"
+
 config THINGSBOARD_ACCESS_TOKEN
-  string "Device Access Token"
+  string
+  prompt "Device Access Token" if !THINGSBOARD_USE_PROVISIONING
   default ""
 
 config THINGSBOARD_FOTA_CHUNK_SIZE

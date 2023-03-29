@@ -20,6 +20,16 @@ if(CONFIG_THINGSBOARD)
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     )
 
+    add_custom_command(
+        OUTPUT
+            ${CMAKE_CURRENT_BINARY_DIR}/generated/provision_response_parser.c
+            ${CMAKE_CURRENT_BINARY_DIR}/generated/provision_response_parser.h
+        COMMAND
+            ${CMAKE_CURRENT_SOURCE_DIR}/scripts/gen_json_parser.py ${CMAKE_CURRENT_BINARY_DIR}/generated/ provision_response.jsonschema
+        DEPENDS provision_response.jsonschema
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    )
+
     zephyr_library_sources(
         src/coap_client.c
         src/tb_fota.c
@@ -27,5 +37,11 @@ if(CONFIG_THINGSBOARD)
         ${CMAKE_CURRENT_BINARY_DIR}/generated/thingsboard_attr_parser.c
     )
 
-zephyr_include_directories(${CMAKE_CURRENT_BINARY_DIR}/generated)
+    zephyr_library_sources_ifdef(
+        CONFIG_THINGSBOARD_USE_PROVISIONING
+        src/provision.c
+        ${CMAKE_CURRENT_BINARY_DIR}/generated/provision_response_parser.c
+    )
+
+    zephyr_include_directories(${CMAKE_CURRENT_BINARY_DIR}/generated)
 endif()

@@ -12,6 +12,7 @@
 
 #include "coap_client.h"
 #include "tb_fota.h"
+#include "provision.h"
 
 #include <logging/log.h>
 LOG_MODULE_REGISTER(thingsboard_client);
@@ -33,7 +34,10 @@ static void time_worker(struct k_work *work);
 
 K_WORK_DELAYABLE_DEFINE(work_time, time_worker);
 
-static const char *access_token = CONFIG_THINGSBOARD_ACCESS_TOKEN;
+static const char *access_token;
+
+static bool provisioned;
+static bool initialized;
 
 static int client_handle_telemetry_response(const struct coap_packet *response, struct coap_reply *reply, const struct sockaddr *from) {
 	ARG_UNUSED(response);
@@ -247,19 +251,7 @@ static void print_modem_info(void) {
 	}
 }
 
-static bool initialized;
-
-void coap_client_setup_cb(void) {
-	LOG_INF("%s", __func__);
-
-	if (!initialized) {
-		if (confirm_fw_update() != 0) {
-			LOG_ERR("Failed to confirm FW update");
-		} else {
-			initialized = true;
-		}
-	}
-
+static void start_client(void) {
 	if (client_subscribe_to_attributes() != 0) {
 		LOG_ERR("Failed to observe attributes");
 	}
@@ -273,11 +265,53 @@ void coap_client_setup_cb(void) {
 	}
 }
 
+static const struct tb_fw_id *current_fw;
+
+static void prov_callback(const char *token) {
+	LOG_INF("Device provisioned");
+	access_token = token;
+	provisioned = true;
+
+	thingsboard_fota_init(access_token, current_fw);
+
+	if (confirm_fw_update() != 0) {
+		LOG_ERR("Failed to confirm FW update");
+	}
+
+	start_client();
+}
+
+void coap_client_setup_cb(void) {
+	LOG_INF("%s", __func__);
+	char name[30];
+	int err;
+
+	if (!initialized) {
+		err = modem_info_string_get(MODEM_INFO_ICCID, name, sizeof(name));
+		if (err < 0) {
+			LOG_ERR("Could not fetch ICCID");
+			return;
+		}
+
+		err = thingsboard_provision_device(name, prov_callback);
+		if (err) {
+			LOG_ERR("Could not provision device");
+			return;
+		}
+
+		initialized = true;
+	}
+
+	if (provisioned) {
+		start_client();
+	}
+}
+
 int thingsboard_init(attr_write_callback cb, const struct tb_fw_id *fw_id) {
 	attribute_cb = cb;
 	int ret;
 
-	thingsboard_fota_init(access_token, fw_id);
+	current_fw = fw_id;
 
 	modem_configure();
 

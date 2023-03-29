@@ -1,0 +1,8 @@
+{
+    "type": "object",
+    "properties": {
+        "status": { "type": "string" },
+        "credentialsType": { "type": "string" },
+        "credentialsValue": { "type": "string" }
+    }
+}
