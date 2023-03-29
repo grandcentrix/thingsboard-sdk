@@ -127,27 +127,23 @@ static int client_subscribe_to_attributes(void)
 
 	err = coap_client_packet_init(&request, COAP_TYPE_CON, COAP_METHOD_GET);
 	if (err < 0) {
-		LOG_ERR("Failed to create CoAP request, %d", err);
 		return err;
 	}
 
 	err = coap_append_option_int(&request, COAP_OPTION_OBSERVE, 0);
 	if (err < 0) {
-		LOG_ERR("Failed to encode CoAP option, %d", err);
 		return err;
 	}
 
 	const uint8_t *uri[] = {"api", "v1", access_token, "attributes", NULL};
 	err = coap_packet_append_uri_path(&request, uri);
 	if (err < 0) {
-		LOG_ERR("Failed to encode uri path, %d", err);
 		return err;
 	}
 
 	err = coap_client_send(&request, client_handle_attribute_notification);
 	if (err < 0) {
-		LOG_ERR("Failed to send CoAP request, %d", errno);
-		return -errno;
+		return err;
 	}
 
 	LOG_INF("Attributes subscribed");
