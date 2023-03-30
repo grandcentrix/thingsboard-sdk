@@ -155,7 +155,7 @@ class NumberProperty(Property):
 		return f"JSON_OBJ_DESCR_PRIM(struct {self.parent.name}, {self.name}, JSON_TOK_NUMBER)"
 
 	def make_member(self):
-		return f"int {self.name};"
+		return f"int32_t {self.name};"
 
 
 def declare_parser(prop):
@@ -197,6 +197,7 @@ def write_header(path, prop):
 
 #include <stddef.h>
 #include <stdbool.h>
+#include <stdint.h>
 
 {prop.make_indices()}
 
