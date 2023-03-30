@@ -19,6 +19,8 @@ typedef void (*attr_write_callback_t)(struct thingsboard_attr *attr);
  * Return the current time in seconds.
  * Time is initially retreived from Thingsboard, given that your
  * rule chain supports it.
+ * You can import the file root_rule_chain.json on your Thingsboard
+ * instance to create a rule chain with the required D2C function.
 */
 time_t thingsboard_time(void);
 
