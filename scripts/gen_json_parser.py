@@ -241,7 +241,7 @@ def load_schema(path):
 
 if __name__ == '__main__':
 	if len(sys.argv) < 3:
-		raise ValueError("Usage: <outpath> <JSON schema file> [more JSON schema files...]")
+		raise ValueError("Usage: <outpath> JSON schema file(s)...")
 	outpath = sys.argv[1]
 
 	prop = load_schema(sys.argv[2])

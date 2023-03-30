@@ -25,7 +25,7 @@ static struct {
 
 K_SEM_DEFINE(time_sem, 0, 1);
 
-static attr_write_callback attribute_cb;
+static attr_write_callback_t attribute_cb;
 
 #define TIME_RETRY_INTERVAL 10000U
 #define TIME_REFRESH_INTERVAL 3600000U
@@ -230,7 +230,7 @@ static void print_modem_info(void) {
 
 	int ret;
 
-	for (int i = 0; i < ARRAY_SIZE(infos); i++) {
+	for (size_t i = 0; i < ARRAY_SIZE(infos); i++) {
 		ret = modem_info_string_get(infos[i],
 						modem_info,
 						sizeof(modem_info));
@@ -303,7 +303,7 @@ void coap_client_setup_cb(void) {
 	}
 }
 
-int thingsboard_init(attr_write_callback cb, const struct tb_fw_id *fw_id) {
+int thingsboard_init(attr_write_callback_t cb, const struct tb_fw_id *fw_id) {
 	attribute_cb = cb;
 	int ret;
 

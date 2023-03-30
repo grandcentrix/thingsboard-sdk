@@ -39,30 +39,6 @@ static inline size_t fw_next_chunk_size(void) {
 	return MIN(rem, CONFIG_THINGSBOARD_FOTA_CHUNK_SIZE);
 }
 
-void thingsboard_check_fw_attributes(struct thingsboard_attr *attr) {
-	if (!(attr->fw_title_parsed && attr->fw_version_parsed && attr->fw_size_parsed)) {
-		LOG_WRN("Attr did not contain all attributes necessary for FW update");
-		return;
-	}
-
-	if (strlen(attr->fw_title) >= sizeof(tb_fota_ctx.title)) {
-		LOG_ERR("FW title too long");
-		return;
-	}
-	if (strlen(attr->fw_version) >= sizeof(tb_fota_ctx.version)) {
-		LOG_ERR("FW version too long");
-		return;
-	}
-
-	strncpy(tb_fota_ctx.title, attr->fw_title, sizeof(tb_fota_ctx.title));
-	strncpy(tb_fota_ctx.version, attr->fw_version, sizeof(tb_fota_ctx.version));
-	tb_fota_ctx.size = attr->fw_size;
-
-	LOG_INF("Target FW: %s - %s (%zu B)", log_strdup(attr->fw_title), log_strdup(attr->fw_version), attr->fw_size);
-
-	thingsboard_start_fw_update();
-}
-
 enum thingsboard_fw_state {
 	TB_FW_DOWNLOADING,
 	TB_FW_DOWNLOADED,
@@ -277,7 +253,7 @@ int confirm_fw_update(void) {
 	return thingsboard_send_telemetry(dst, err);
 }
 
-int thingsboard_start_fw_update(void) {
+static int thingsboard_start_fw_update(void) {
 	int err;
 
 	LOG_INF("Starting FW update process");
@@ -328,4 +304,28 @@ int thingsboard_start_fw_update(void) {
 void thingsboard_fota_init(const char *_access_token, const struct tb_fw_id *_current_fw) {
 	access_token = _access_token;
 	current_fw = _current_fw;
+}
+
+void thingsboard_check_fw_attributes(struct thingsboard_attr *attr) {
+	if (!(attr->fw_title_parsed && attr->fw_version_parsed && attr->fw_size_parsed)) {
+		LOG_WRN("Attr did not contain all attributes necessary for FW update");
+		return;
+	}
+
+	if (strlen(attr->fw_title) >= sizeof(tb_fota_ctx.title)) {
+		LOG_ERR("FW title too long");
+		return;
+	}
+	if (strlen(attr->fw_version) >= sizeof(tb_fota_ctx.version)) {
+		LOG_ERR("FW version too long");
+		return;
+	}
+
+	strncpy(tb_fota_ctx.title, attr->fw_title, sizeof(tb_fota_ctx.title));
+	strncpy(tb_fota_ctx.version, attr->fw_version, sizeof(tb_fota_ctx.version));
+	tb_fota_ctx.size = attr->fw_size;
+
+	LOG_INF("Target FW: %s - %s (%zu B)", log_strdup(attr->fw_title), log_strdup(attr->fw_version), attr->fw_size);
+
+	thingsboard_start_fw_update();
 }

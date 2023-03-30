@@ -57,7 +57,7 @@ static void client_state_set(enum coap_client_state state) {
 	}
 }
 
-void *coap_client_buf(size_t *len) {
+static void *coap_client_buf(size_t *len) {
 	void *block = NULL;
 	int err;
 
@@ -71,7 +71,7 @@ void *coap_client_buf(size_t *len) {
 	return block;
 }
 
-void coap_client_buf_free(void *buf) {
+static void coap_client_buf_free(void *buf) {
 	void *block = buf;
 	k_mem_slab_free(&coap_msg_slab, &block);
 }
