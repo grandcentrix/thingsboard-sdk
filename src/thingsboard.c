@@ -85,6 +85,36 @@ static int client_handle_attribute_notification(const struct coap_packet *respon
 	return 0;
 }
 
+/**
+ * Parse an int64_t from a non-zero-terminated buffer.
+ *
+ * The value is expected to be a valid (and current) timestamp.
+ * Hence, the only error case that is handled is that the buffer
+ * does not actually consist of digits. No attempt is made to validate
+ * the resulting number.
+ *
+ * Limitations:
+ * - It does not actually handle negative values
+ * - It does not take care of integer overflows
+ * - The buffer must only contain valid digits
+ */
+static int timestamp_from_buf(int64_t *value, const void *buf, size_t sz) {
+	int64_t result = 0;
+	size_t i;
+	const char *next;
+
+	for (i = 0, next = buf; i < sz; i++, next++) {
+		if (*next < '0' || *next > '9') {
+			LOG_WRN("Buffer contains non-digits: %c", *next);
+			return -EBADMSG;
+		}
+		result = result * 10 + (*next - '0');
+	}
+
+	*value = result;
+	return 0;
+}
+
 static int client_handle_time_response(const struct coap_packet *response, struct coap_reply *reply, const struct sockaddr *from)
 {
 	ARG_UNUSED(from);
@@ -92,6 +122,7 @@ static int client_handle_time_response(const struct coap_packet *response, struc
 	int64_t ts = 0;
 	const uint8_t *payload;
 	uint16_t payload_len;
+	int err;
 
 	LOG_INF("%s", __func__);
 
@@ -103,13 +134,10 @@ static int client_handle_time_response(const struct coap_packet *response, struc
 
 	coap_reply_clear(reply);
 
-	/* Response is not zero terminated, so it's probably simpler to just parse that ourselves */
-	for (int i = 0; i < payload_len; i++) {
-		char next = payload[i];
-		if (next < '0' || next > '9') {
-			break;
-		}
-		ts = ts * 10 + (next - '0');
+	err = timestamp_from_buf(&ts, payload, payload_len);
+	if (err) {
+		LOG_ERR("Parsing of time response failed");
+		return err;
 	}
 
 	tb_time.tb_time = ts;
