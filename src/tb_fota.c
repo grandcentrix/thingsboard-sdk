@@ -163,7 +163,7 @@ static int client_handle_fw_chunk(const struct coap_packet *response, struct coa
 	case TB_FW_DOWNLOADING:
 		if (fw_next_chunk() % 10 == 0) {
 			err = snprintf(progress_tele, sizeof(progress_tele), "{\"fw_progress\": %zu}", tb_fota_ctx.offset);
-			if (err > 0 && err < sizeof(progress_tele)) {
+			if (err > 0 && (size_t)err < sizeof(progress_tele)) {
 				thingsboard_send_telemetry(progress_tele, err);
 			} else {
 				LOG_ERR("Could not format FW progress");
@@ -245,7 +245,7 @@ int confirm_fw_update(void) {
 	}
 
 	err = snprintf(dst, sizeof(dst), fw_state, current_fw->fw_title, current_fw->fw_version);
-	if (err < 0 || err > sizeof(dst)) {
+	if (err < 0 || (size_t) err >= sizeof(dst)) {
 		LOG_ERR("FW info does not fit");
 		return -ENOMEM;
 	}
