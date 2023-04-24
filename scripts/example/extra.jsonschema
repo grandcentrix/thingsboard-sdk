@@ -1,0 +1,6 @@
+{
+    "type": "object",
+    "properties": {
+        "extra_value": { "type": "string" }
+    }
+}
