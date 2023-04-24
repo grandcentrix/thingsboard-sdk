@@ -22,7 +22,6 @@
 # - The name of all identifiers is derived from the filename (w/o extension) of the
 #   first supplied JSON schema.
 
-import json
 import json_ref_dict as jrd
 import sys
 import os
@@ -84,7 +83,8 @@ class ObjectProperty(Property):
 		return self._name
 
 	def make_descriptor(self):
-		return f"JSON_OBJ_DESCR_OBJECT(struct {self.parent.name}, {self._name}, {self.name}_desc)"
+		return f"JSON_OBJ_DESCR_OBJECT(struct {self.parent.name}, " \
+		f"{self._name}, {self.name}_desc)"
 
 	def make_member(self):
 		return f"struct {self.name} {self._name};"
