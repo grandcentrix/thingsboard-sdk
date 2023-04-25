@@ -390,7 +390,10 @@ static int udp_setup(void) {
 	err = bind(coap_socket, (struct sockaddr *)&src, sizeof(src));
 	if (err < 0) {
 		LOG_ERR("bind failed : %d", errno);
-		return -errno;
+		err = -errno;
+		/* Ignore possible errors, there is nothing we can do */
+		zsock_close(coap_socket);
+		return err;
 	}
 
 	client_state_set(COAP_CLIENT_ACTIVE);
