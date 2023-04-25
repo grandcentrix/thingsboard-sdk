@@ -10,7 +10,7 @@ if(CONFIG_THINGSBOARD)
     )
 
     add_custom_command(
-        OUTPUT 
+        OUTPUT
             ${CMAKE_CURRENT_BINARY_DIR}/generated/thingsboard_attr_parser.c
             ${CMAKE_CURRENT_BINARY_DIR}/generated/thingsboard_attr_parser.h
         COMMAND

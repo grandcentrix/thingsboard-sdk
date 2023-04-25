@@ -202,7 +202,7 @@ static void time_worker(struct k_work *work) {
 	int64_t since_last_request = k_uptime_get() - tb_time.last_request;
 
 	// Request is due
-	if ((!tb_time.last_request) || 
+	if ((!tb_time.last_request) ||
 		(since_last_request >= TIME_REFRESH_INTERVAL) ||
 		(tb_time.last_request > tb_time.own_time
 			&& since_last_request >= TIME_RETRY_INTERVAL)) {
@@ -246,7 +246,7 @@ int thingsboard_send_telemetry(const void *payload, size_t sz) {
 static void print_modem_info(void) {
 	char info_name[50];
 	char modem_info[50];
-	
+
 	enum modem_info infos[] = {
 		MODEM_INFO_FW_VERSION,
 		MODEM_INFO_UICC,

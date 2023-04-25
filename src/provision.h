@@ -1,7 +1,7 @@
 #ifndef PROVISION_H
 #define PROVISION_H
 
-/** 
+/**
  * Callback that will be called with the token as soon as
  * provisioning has been completed successfully.
 */
