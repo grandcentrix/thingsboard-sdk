@@ -21,7 +21,7 @@ static int token_settings_set(const char *name, size_t len,
 	int err;
 
 	if (settings_name_steq(name, "token", &next) && !next) {
-		LOG_INF("Retrieving access token");
+		LOG_INF("Retrieving access token from flash");
 		if (len > sizeof(access_token)) {
 			return -EINVAL;
 		}

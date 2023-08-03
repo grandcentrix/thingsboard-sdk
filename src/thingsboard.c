@@ -126,13 +126,13 @@ static int client_handle_time_response(const struct coap_packet *response, struc
 
 	LOG_INF("%s", __func__);
 
+	coap_reply_clear(reply);
+
 	payload = coap_packet_get_payload(response, &payload_len);
 	if (!payload_len) {
 		LOG_WRN("Received empty timestamp");
 		return -ENOMSG;
 	}
-
-	coap_reply_clear(reply);
 
 	err = timestamp_from_buf(&ts, payload, payload_len);
 	if (err) {
