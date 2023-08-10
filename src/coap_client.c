@@ -455,15 +455,9 @@ static int client_cycle_pendings(void) {
 
 static int client_active(void) {
 	size_t len;
-	void *buf = coap_client_buf(&len);
+	static uint8_t rx_buf[CONFIG_COAP_CLIENT_MSG_LEN];
 
-	if (!buf) {
-		LOG_ERR("Can not allocate buffer for recv");
-		return -ENOMEM;
-	}
-
-	receive(buf, len);
-	coap_client_buf_free(buf);
+	receive(rx_buf, sizeof(rx_buf));
 
 	return client_cycle_pendings();
 }
