@@ -133,10 +133,8 @@ static enum thingsboard_fw_state fw_chunk_process(const void *buf, size_t size) 
 	return TB_FW_DOWNLOADED;
 }
 
-static int client_handle_fw_chunk(const struct coap_packet *response, struct coap_reply *reply, const struct sockaddr *from)
+static int client_handle_fw_chunk(struct coap_client_request *req, struct coap_packet *response)
 {
-	ARG_UNUSED(from);
-
 	const uint8_t *payload;
 	uint16_t payload_len;
 	enum thingsboard_fw_state state;
@@ -149,8 +147,6 @@ static int client_handle_fw_chunk(const struct coap_packet *response, struct coa
 		LOG_WRN("Received empty response");
 		return -ENOMSG;
 	}
-
-	coap_reply_clear(reply);
 
 	state = fw_chunk_process(payload, payload_len);
 	err = client_set_fw_state(state);
@@ -182,41 +178,40 @@ static int client_handle_fw_chunk(const struct coap_packet *response, struct coa
 static int client_fw_get_next_chunk(void) {
 	int err;
 	unsigned int chunk = fw_next_chunk();
-	struct coap_packet request;
+	struct coap_client_request *request;
 
 	LOG_INF("Requesting chunk %u of %u", chunk, fw_num_chunks());
 
-	err = coap_client_packet_init(&request, COAP_TYPE_CON, COAP_METHOD_GET);
-	if (err < 0) {
-		LOG_ERR("Failed to create CoAP request, %d", err);
-		return err;
+	request = coap_client_request_alloc(COAP_TYPE_CON, COAP_METHOD_GET);
+	if (!request) {
+		return -ENOMEM;
 	}
 
 	const uint8_t *uri[] = {"fw", access_token, NULL};
-	err = coap_packet_append_uri_path(&request, uri);
+	err = coap_packet_append_uri_path(&request->pkt, uri);
 	if (err < 0) {
 		LOG_ERR("Failed to encode uri path, %d", err);
 		return err;
 	}
 
-	err = coap_packet_append_uri_query_s(&request, "title=%s", tb_fota_ctx.title);
+	err = coap_packet_append_uri_query_s(&request->pkt, "title=%s", tb_fota_ctx.title);
 	if (err) {
 		return err;
 	}
-	err = coap_packet_append_uri_query_s(&request, "version=%s", tb_fota_ctx.version);
+	err = coap_packet_append_uri_query_s(&request->pkt, "version=%s", tb_fota_ctx.version);
 	if (err) {
 		return err;
 	}
-	err = coap_packet_append_uri_query_d(&request, "chunk=%d", (int)chunk);
+	err = coap_packet_append_uri_query_d(&request->pkt, "chunk=%d", (int)chunk);
 	if (err) {
 		return err;
 	}
-	err = coap_packet_append_uri_query_d(&request, "size=%d", CONFIG_THINGSBOARD_FOTA_CHUNK_SIZE);
+	err = coap_packet_append_uri_query_d(&request->pkt, "size=%d", CONFIG_THINGSBOARD_FOTA_CHUNK_SIZE);
 	if (err) {
 		return err;
 	}
 
-	err = coap_client_send(&request, client_handle_fw_chunk);
+	err = coap_client_send(request, client_handle_fw_chunk);
 	if (err < 0) {
 		LOG_ERR("Failed to send CoAP request, %d", errno);
 		return -errno;
