@@ -16,11 +16,19 @@ static uint16_t next_token;
 
 static struct sockaddr_storage server;
 
-struct coap_reply replies[CONFIG_COAP_CLIENT_NUM_MSGS];
-struct coap_pending pendings[CONFIG_COAP_CLIENT_NUM_MSGS];
+#define SLAB_SIZE (sizeof(struct coap_client_request) + CONFIG_COAP_CLIENT_MSG_LEN)
+#define SLAB_ALIGN (__alignof__ (struct coap_client_request))
 
 /* Use +1 to always allow receive to allocate a block */
-K_MEM_SLAB_DEFINE(coap_msg_slab, CONFIG_COAP_CLIENT_MSG_LEN, CONFIG_COAP_CLIENT_NUM_MSGS+1, 1);
+K_MEM_SLAB_DEFINE(coap_msg_slab, SLAB_SIZE, CONFIG_COAP_CLIENT_NUM_MSGS+1, SLAB_ALIGN);
+
+static sys_dlist_t requests;
+
+#define COAP_FOR_EACH_REQUEST_SAFE(r, rs) SYS_DLIST_FOR_EACH_CONTAINER_SAFE(&requests, (r), (rs), node)
+#define COAP_FOR_EACH_REQUEST(r) SYS_DLIST_FOR_EACH_CONTAINER(&requests, (r), node)
+
+static void on_work(struct k_work* work);
+K_WORK_DELAYABLE_DEFINE(work_coap, on_work);
 
 static enum coap_client_state {
 	COAP_CLIENT_DISCONNECTED,
@@ -57,43 +65,56 @@ static void client_state_set(enum coap_client_state state) {
 	}
 }
 
-static void *coap_client_buf(size_t *len) {
+static void coap_client_request_free(struct coap_client_request *req) {
+	void *block = req;
+	if (sys_dnode_is_linked(&req->node)) {
+		sys_dlist_remove(&req->node);
+	}
+	k_mem_slab_free(&coap_msg_slab, &block);
+}
+
+struct coap_client_request *coap_client_request_alloc(uint8_t type, uint8_t code) {
 	void *block = NULL;
+	uint8_t *data;
+	uint16_t datalen;
+	struct coap_client_request *req;
 	int err;
 
 	err = k_mem_slab_alloc(&coap_msg_slab, &block, K_NO_WAIT);
 	if (err < 0) {
+		LOG_ERR("Could not allocate memory for request");
 		return NULL;
 	}
 
-	*len = CONFIG_COAP_CLIENT_MSG_LEN;
+	req = (struct coap_client_request *)block;
+	*req = (struct coap_client_request){0};
+	data = (uint8_t*)block + sizeof(*req);
+	datalen = SLAB_SIZE - sizeof(*req);
 
-	return block;
-}
-
-static void coap_client_buf_free(void *buf) {
-	void *block = buf;
-	k_mem_slab_free(&coap_msg_slab, &block);
-}
-
-int coap_client_packet_init(struct coap_packet *cpkt, uint8_t type, uint8_t code) {
-	int err;
-	size_t len;
-	void *buf;
-
-	buf = coap_client_buf(&len);
-	if (!buf) {
-		LOG_ERR("No more buffers");
-		return -ENOMEM;
-	}
+	req->confirmable = type == COAP_TYPE_CON;
 
 	next_token++;
-	err = coap_packet_init(cpkt, buf, len,
-						   APP_COAP_VERSION, type,
-						   sizeof(next_token), (uint8_t *)&next_token,
-						   code, coap_next_id());
+	req->tkl = sizeof(next_token);
+	memcpy(req->token, &next_token, req->tkl);
+
+	req->id = coap_next_id();
+	err = coap_packet_init(&req->pkt, data, datalen, APP_COAP_VERSION, type, req->tkl, req->token, code, req->id);
 	if (err < 0) {
-		coap_client_buf_free(buf);
+		coap_client_request_free(req);
+		return NULL;
+	}
+
+	sys_dlist_append(&requests, &req->node);
+
+	return req;
+}
+
+int coap_client_request_observe(struct coap_client_request *req) {
+	int err;
+
+	req->observation = true;
+	err = coap_append_option_int(&req->pkt, COAP_OPTION_OBSERVE, 0);
+	if (err < 0) {
 		return err;
 	}
 
@@ -109,124 +130,99 @@ static int send_raw(void *buf, size_t len) {
 	return 0;
 }
 
-static int client_send_pending(struct coap_pending *p) {
-	if (!coap_pending_cycle(p)) {
-		LOG_WRN("Pending terminally expired: %p", (void*)p);
-		return -ENETRESET;
-	}
-
-	LOG_DBG("Sending pending %p, retries %u", (void*)p, p->retries);
-
-	return send_raw(p->data, p->len);
-}
-
-static int coap_make_request(struct coap_packet *pkt, coap_reply_t replyf) {
-	struct coap_pending *pending = NULL;
-	struct coap_reply *reply = NULL;
+static int client_send_request(struct coap_client_request *req) {
 	int err;
 
-	if (coap_header_get_type(pkt) != COAP_TYPE_CON) {
-		/*
-		 * For some stupid reason, responses to non-con-requests
-		 * are not required to carry the same msg id as the request,
-		 * and the pending structs only carry the msg id to match
-		 * responses, and also manage the memory. Reply structs have
-		 * no concept of expiry or anything, so they can't be cleaned
-		 * up on their own. Hence, we need a pending struct to track
-		 * the whereabouts of our outgoing message, which only works if
-		 * they are of type CON.
-		 */
-		err = -EINVAL;
-		goto cleanup_buf;
-	}
-
-	pending = coap_pending_next_unused(pendings, ARRAY_SIZE(pendings));
-	if (!pending) {
-		LOG_ERR("No pending struct available to track responses");
-		err = -ENOMEM;
-		goto cleanup_buf;
-	}
-
-	reply = coap_reply_next_unused(replies, ARRAY_SIZE(replies));
-	if (!reply) {
-		LOG_ERR("No reply struct available to track responses");
-		err = -ENOMEM;
-		goto cleanup_p;
-	}
-
-	err = coap_pending_init(pending, pkt, (struct sockaddr*)&server, CONFIG_COAP_NUM_RETRIES);
-	if (err) {
-		goto cleanup_r;
-	}
-
-	coap_reply_init(reply, pkt);
-	reply->reply = replyf;
-
-	err = client_send_pending(pending);
-	if (err == 0) {
-		return 0;
-	}
-
-cleanup_r:
-	coap_reply_clear(reply);
-cleanup_p:
-	coap_pending_clear(pending);
-cleanup_buf:
-	coap_client_buf_free(pkt->data);
-
-	return err;
-}
-
-int coap_client_send(struct coap_packet *pkt, coap_reply_t replyf) {
-	int err;
-
-	LOG_HEXDUMP_DBG(pkt->data, pkt->offset, "sending coap packet");
-
-	if (replyf) {
-		return coap_make_request(pkt, replyf);
-	}
-
-	err = send_raw(pkt->data, pkt->offset);
-
-	coap_client_buf_free(pkt->data);
-
-	return err;
-}
-
-int coap_client_make_request(const uint8_t** uri, const void *payload, size_t plen, uint8_t type, uint8_t code, coap_reply_t reply) {
-	int err;
-	struct coap_packet request;
-
-	err = coap_client_packet_init(&request, type, code);
+	LOG_INF("Sending request %p, %u retries left", req, req->retries);
+	err = send_raw(req->pkt.data, req->pkt.offset);
 	if (err < 0) {
-		LOG_ERR("Could not create request");
+		LOG_ERR("Error sending request: %d", err);
+	}
+
+	return err;
+}
+
+/**
+ * Find the next request to expire. If there are no
+ * requests, returns NULL. Otherwise, int64_t pointed to
+ * by next_expiry will contain the time the returned
+ * request expires.
+ */
+static struct coap_client_request *coap_request_next_to_expire(int64_t *next_expiry)
+{
+	struct coap_client_request *found = NULL, *p;
+	int64_t expiry, min_expiry = 0;
+
+	COAP_FOR_EACH_REQUEST(p) {
+		if (!p->t0) {
+			continue;
+		}
+
+		expiry = p->t0 + p->timeout;
+
+		if (!found || (int32_t)(expiry - min_expiry) < 0) {
+			min_expiry = expiry;
+			found = p;
+		}
+	}
+
+	*next_expiry = min_expiry;
+
+	return found;
+}
+
+int coap_client_send(struct coap_client_request *req, coap_reply_handler_t reply) {
+	LOG_HEXDUMP_DBG(req->pkt.data, req->pkt.offset, "sending coap packet");
+	int err;
+
+	req->reply_handler = reply;
+	req->t0 = k_uptime_get();
+
+	if (req->reply_handler || req->confirmable) {
+		req->retries = CONFIG_COAP_NUM_RETRIES;
+	}
+
+	err = k_work_reschedule(&work_coap, K_NO_WAIT);
+	if (err < 0) {
 		return err;
 	}
 
-	err = coap_packet_append_uri_path(&request, uri);
+	return 0;
+}
+
+int coap_client_make_request(const uint8_t** uri, const void *payload, size_t plen, uint8_t type, uint8_t code, coap_reply_handler_t reply) {
+	int err;
+	struct coap_client_request *req;
+
+	req = coap_client_request_alloc(type, code);
+	if (!req) {
+		return -ENOMEM;
+	}
+
+	err = coap_packet_append_uri_path(&req->pkt, uri);
 	if (err < 0) {
 		LOG_ERR("Could not append URI path");
 		goto cleanup;
 	}
 
 	if (payload && plen) {
-		err = coap_packet_append_payload_marker(&request);
+		err = coap_packet_append_payload_marker(&req->pkt);
 		if (err) {
 			LOG_ERR("Could not append payload marker");
 			goto cleanup;
 		}
 
-		err = coap_packet_append_payload(&request, payload, strlen(payload));
+		err = coap_packet_append_payload(&req->pkt, payload, plen);
 		if (err < 0) {
 			LOG_ERR("Failed to append payload, %d", err);
 			goto cleanup;
 		}
 	}
 
-	return coap_client_send(&request, reply);
+	return coap_client_send(req, reply);
 
 cleanup:
-	coap_client_buf_free(request.data);
+	coap_client_request_free(req);
 	return err;
 }
 
@@ -249,14 +245,35 @@ static int client_ack_message(struct coap_packet *response) {
 	return send_raw(ack.data, ack.offset);
 }
 
+static int client_reset_message(struct coap_packet *response) {
+	struct coap_packet reset;
+	uint8_t buf[4];
+	uint16_t msg_id;
+	int err;
+
+	msg_id = coap_header_get_id(response);
+	err = coap_packet_init(&reset, buf, sizeof(buf),
+			APP_COAP_VERSION, COAP_TYPE_RESET,
+			0, NULL,
+			0, msg_id);
+	if (err) {
+		LOG_ERR("Could not initialize reset");
+		return err;
+	}
+
+	return send_raw(reset.data, reset.offset);
+}
+
 static int client_handle_get_response(uint8_t *buf, int received, struct sockaddr *from)
 {
 	int err;
 	struct coap_packet response;
-	struct coap_reply *reply;
-	struct coap_pending *pending;
+	struct coap_client_request *r, *rs;
 	uint8_t code;
 	uint8_t type;
+	uint16_t id;
+	uint8_t token[COAP_TOKEN_MAX_LEN];
+	uint8_t tkl;
 
 	err = coap_packet_parse(&response, buf, received, NULL, 0);
 	if (err < 0) {
@@ -266,30 +283,79 @@ static int client_handle_get_response(uint8_t *buf, int received, struct sockadd
 
 	code = coap_header_get_code(&response);
 	type = coap_header_get_type(&response);
+	id = coap_header_get_id(&response);
+	tkl = coap_header_get_token(&response, token);
 
-	pending = coap_pending_received(&response, pendings, ARRAY_SIZE(pendings));
-	if (pending) {
-		coap_client_buf_free(pending->data);
-		coap_pending_clear(pending);
+	if (type == COAP_TYPE_ACK && code == 0) {
+		/*
+		 * This is an empty ACK message. It is matched
+		 * to the original request by the message ID.
+		 * RFC7252 5.3.2
+		 */
+		COAP_FOR_EACH_REQUEST_SAFE(r, rs) {
+			if (r->confirmable && r->id == id) {
+				r->confirmable = false;
+				if (r->reply_handler) {
+					/*
+					 * We expect a reply -
+					 * Let's extend the timeout of this request
+					 * since we got something.
+					 * The spec doesn't really define how
+					 * to handle the case of getting an ACK
+					 * but never an actual response. Clients should
+					 * give the server "reasonable" time to create
+					 * the response, whatever that means.
+					 * RFC7252 5.2.2, Implementation Notes
+					 */
+					r->t0 = k_uptime_get();
+					r->retries = CONFIG_COAP_NUM_RETRIES;
+				} else {
+					coap_client_request_free(r);
+				}
+				return 0;
+			}
+		}
+		/*
+		 * If the ACK does not match any message, it is
+		 * silently ignored. RFC7252 4.2
+		 */
+		return 0;
 	}
 
-	if (code != 0) {
-		/* It's not obvious from the function's name but this calls the reply's handler */
-		reply = coap_response_received(&response, from, replies, ARRAY_SIZE(replies));
+	/*
+	 * In a piggybacked response, message ID and token must match.
+	 */
+	COAP_FOR_EACH_REQUEST_SAFE(r, rs) {
+		if (r->id == id && !memcmp(r->token, token, tkl)) {
+			if (r->reply_handler) {
+				r->reply_handler(r, &response);
+			}
 
-		if (!reply && !pending) {
-			LOG_HEXDUMP_WRN(buf, received, "Received unexpected CoAP message");
-		}
+			if (!r->observation) {
+				/* Request done */
+				coap_client_request_free(r);
+			} else {
+				/*
+				 * This stops the handler for pending requests
+				 * from re-sending this request
+				 */
+				r->t0 = 0;
+			}
 
-		if(reply && type == COAP_TYPE_CON) {
-			return client_ack_message(&response);
+			if(type == COAP_TYPE_CON) {
+				return client_ack_message(&response);
+			}
+			return 0;
 		}
 	}
 
-	return 0;
+	LOG_HEXDUMP_WRN(buf, received, "Received unexpected CoAP message");
+
+	return client_reset_message(&response);
 }
 
 static void receive(void *buf, size_t len) {
+
 	int err;
 	int received;
 	struct sockaddr src = {0};
@@ -403,9 +469,7 @@ static int udp_setup(void) {
 
 static int udp_teardown(void) {
 	int err;
-	struct coap_pending *p;
-	struct coap_reply *r;
-	int i;
+	struct coap_client_request *r, *rs;
 
 	err = zsock_close(coap_socket);
 	if (err) {
@@ -413,15 +477,8 @@ static int udp_teardown(void) {
 		return err;
 	}
 
-	for (i = 0, p = pendings; i < ARRAY_SIZE(pendings); i++, p++) {
-		if (p->data) {
-			coap_client_buf_free(p->data);
-		}
-		coap_pending_clear(p);
-	}
-
-	for (i = 0, r = replies; i < ARRAY_SIZE(replies); i++, r++) {
-		coap_reply_clear(r);
+	COAP_FOR_EACH_REQUEST_SAFE(r, rs) {
+		coap_client_request_free(r);
 	}
 
 	client_state_set(COAP_CLIENT_DISCONNECTED);
@@ -429,37 +486,72 @@ static int udp_teardown(void) {
 	return 0;
 }
 
-static void on_work(struct k_work* work);
-K_WORK_DELAYABLE_DEFINE(work_coap, on_work);
+/**
+ * Check all pending requests.
+ */
+static int client_cycle_requests(void) {
+	struct coap_client_request *req;
+	int64_t next_expiry;
+	int64_t next_sched = INT64_MAX;
+	int64_t now = k_uptime_get();
+	int err;
 
-static int client_cycle_pendings(void) {
-	struct coap_pending *p;
-	uint32_t expiry;
-	uint32_t now = k_uptime_get_32();
+	while ((req = coap_request_next_to_expire(&next_expiry))) {
+		if (next_expiry > now) {
+			/* This isn't expired yet */
+			if (next_expiry < next_sched) {
+				next_sched = next_expiry;
+			}
+			break;
+		}
 
-	p = coap_pending_next_to_expire(pendings, ARRAY_SIZE(pendings));
-	if (!p) {
-		return 0;
+		if (!req->timeout) {
+			/* First attempt at sending */
+			if (!req->retries) {
+				/* This is a fire-and-forget request */
+				err = client_send_request(req);
+				if (err < 0) {
+					return err;
+				}
+				coap_client_request_free(req);
+				continue;
+			}
+
+			req->timeout = CONFIG_COAP_INIT_ACK_TIMEOUT_MS;
+		} else {
+			if (!req->retries) {
+				LOG_ERR("Request %p has timed out", req);
+				return -ENETRESET;
+			}
+
+			req->t0 += req->timeout;
+			req->timeout = req->timeout << 1;
+			req->retries--;
+
+			LOG_INF("Retrying request %p", req);
+		}
+
+		err = client_send_request(req);
+		if (err < 0) {
+			return err;
+		}
 	}
 
-	expiry = p->t0 + p->timeout;
-
-	// Overflow aware way to put (now > expiry)
-	if ((int32_t)(expiry - now) < 0) {
-		LOG_INF("Pending %p expired", (void*)p);
-		return client_send_pending(p);
+	if (next_sched != INT64_MAX) {
+		err = k_work_reschedule(&work_coap, K_MSEC(next_sched - now));
+		if (err < 0) {
+			return err;
+		}
 	}
 
 	return 0;
 }
 
 static int client_active(void) {
-	size_t len;
 	static uint8_t rx_buf[CONFIG_COAP_CLIENT_MSG_LEN];
-
 	receive(rx_buf, sizeof(rx_buf));
 
-	return client_cycle_pendings();
+	return client_cycle_requests();
 }
 
 static void on_work(struct k_work* work) {
@@ -497,39 +589,23 @@ K_WORK_DELAYABLE_DEFINE(stat_work, statistics);
 
 static void statistics(struct k_work *work) {
 	uint32_t mem_free;
-	uint32_t p_free = 0;
-	uint32_t r_free = 0;
-	struct coap_pending *p;
-	struct coap_reply *r;
-	int i;
 
 	ARG_UNUSED(work);
 
 	mem_free = k_mem_slab_num_free_get(&coap_msg_slab);
 
-	for (i = 0, p = pendings; i < ARRAY_SIZE(pendings); i++, p++) {
-		if (!p->timeout) {
-			p_free++;
-		}
-	}
-
-	for (i = 0, r = replies; i < ARRAY_SIZE(replies); i++, r++) {
-		if (!r->reply) {
-			r_free++;
-		}
-	}
-
-	LOG_INF("CoAP stats: free: %u mem blocks, %u pendings, %u replies", mem_free, p_free, r_free);
+	LOG_INF("CoAP stats: free: %u requests", mem_free);
 
 	k_work_schedule(&stat_work, K_SECONDS(30));
 }
-
 
 int coap_client_init(void (*cb)(void))
 {
 	int err;
 
 	active_cb = cb;
+
+	sys_dlist_init(&requests);
 
 	err = server_resolve();
 	if (err != 0) {

@@ -39,21 +39,8 @@ static const char *access_token;
 static bool provisioned;
 static bool initialized;
 
-static int client_handle_telemetry_response(const struct coap_packet *response, struct coap_reply *reply, const struct sockaddr *from) {
-	ARG_UNUSED(response);
-	ARG_UNUSED(reply);
-	ARG_UNUSED(from);
-
-	coap_reply_clear(reply);
-
-	return 0;
-}
-
-static int client_handle_attribute_notification(const struct coap_packet *response, struct coap_reply *reply, const struct sockaddr *from)
+static void client_handle_attribute_notification(struct coap_client_request *req, struct coap_packet *response)
 {
-	ARG_UNUSED(reply);
-	ARG_UNUSED(from);
-
 	LOG_INF("%s", __func__);
 
 	uint8_t *payload;
@@ -66,14 +53,14 @@ static int client_handle_attribute_notification(const struct coap_packet *respon
 	payload = (uint8_t*)coap_packet_get_payload(response, &payload_len);
 	if (!payload_len) {
 		LOG_WRN("Received empty attributes");
-		return -ENOMSG;
+		return;
 	}
 	LOG_HEXDUMP_DBG(payload, payload_len, "Received attributes");
 
 	err = thingsboard_attr_from_json(payload, payload_len, &attr);
 	if (err < 0) {
 		LOG_ERR("Parsing attributes failed");
-		return err;
+		return;
 	}
 
 	thingsboard_check_fw_attributes(&attr);
@@ -81,8 +68,6 @@ static int client_handle_attribute_notification(const struct coap_packet *respon
 	if (attribute_cb) {
 		attribute_cb(&attr);
 	}
-
-	return 0;
 }
 
 /**
@@ -115,10 +100,8 @@ static int timestamp_from_buf(int64_t *value, const void *buf, size_t sz) {
 	return 0;
 }
 
-static int client_handle_time_response(const struct coap_packet *response, struct coap_reply *reply, const struct sockaddr *from)
+static void client_handle_time_response(struct coap_client_request *req, struct coap_packet *response)
 {
-	ARG_UNUSED(from);
-
 	int64_t ts = 0;
 	const uint8_t *payload;
 	uint16_t payload_len;
@@ -126,55 +109,51 @@ static int client_handle_time_response(const struct coap_packet *response, struc
 
 	LOG_INF("%s", __func__);
 
-	coap_reply_clear(reply);
-
 	payload = coap_packet_get_payload(response, &payload_len);
 	if (!payload_len) {
 		LOG_WRN("Received empty timestamp");
-		return -ENOMSG;
+		return;
 	}
 
 	err = timestamp_from_buf(&ts, payload, payload_len);
 	if (err) {
 		LOG_ERR("Parsing of time response failed");
-		return err;
+		return;
 	}
 
 	tb_time.tb_time = ts;
 	tb_time.own_time = k_uptime_get();
 
 	k_sem_give(&time_sem);
-
-	return 0;
 }
 
 static int client_subscribe_to_attributes(void)
 {
 	int err;
-	struct coap_packet request;
+	struct coap_client_request *request;
 
-	err = coap_client_packet_init(&request, COAP_TYPE_CON, COAP_METHOD_GET);
-	if (err < 0) {
-		return err;
+	request = coap_client_request_alloc(COAP_TYPE_CON, COAP_METHOD_GET);
+	if (!request) {
+		return -ENOMEM;
 	}
 
-	err = coap_append_option_int(&request, COAP_OPTION_OBSERVE, 0);
+	err = coap_client_request_observe(request);
 	if (err < 0) {
 		return err;
 	}
 
 	const uint8_t *uri[] = {"api", "v1", access_token, "attributes", NULL};
-	err = coap_packet_append_uri_path(&request, uri);
+	err = coap_packet_append_uri_path(&request->pkt, uri);
 	if (err < 0) {
 		return err;
 	}
 
-	err = coap_client_send(&request, client_handle_attribute_notification);
+	err = coap_client_send(request, client_handle_attribute_notification);
 	if (err < 0) {
 		return err;
 	}
 
-	LOG_INF("Attributes subscribed");
+	LOG_INF("Attributes subscription request sent");
 
 	return 0;
 }
@@ -234,9 +213,9 @@ int thingsboard_send_telemetry(const void *payload, size_t sz) {
 	int err;
 
 	const uint8_t *uri[] = {"api", "v1", access_token, "telemetry", NULL};
-	err = coap_client_make_request(uri, payload, sz, COAP_TYPE_CON, COAP_METHOD_POST, client_handle_telemetry_response);
+	err = coap_client_make_request(uri, payload, sz, COAP_TYPE_CON, COAP_METHOD_POST, NULL);
 	if (err) {
-		LOG_ERR("Failed to send attributes");
+		LOG_ERR("Failed to send telemetry");
 		return err;
 	}
 
