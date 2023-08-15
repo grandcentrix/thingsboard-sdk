@@ -36,9 +36,6 @@ K_WORK_DELAYABLE_DEFINE(work_time, time_worker);
 
 static const char *access_token;
 
-static bool provisioned;
-static bool initialized;
-
 static int client_handle_attribute_notification(struct coap_client_request *req, struct coap_packet *response)
 {
 	LOG_INF("%s", __func__);
@@ -258,7 +255,47 @@ static void print_modem_info(void) {
 	}
 }
 
+static void start_client(void);
+
+static const struct tb_fw_id *current_fw;
+
+static void prov_callback(const char *token) {
+	LOG_INF("Device provisioned");
+	access_token = token;
+
+	thingsboard_fota_init(access_token, current_fw);
+
+	if (confirm_fw_update() != 0) {
+		LOG_ERR("Failed to confirm FW update");
+	}
+
+	start_client();
+}
+
 static void start_client(void) {
+	int err;
+	char name[30];
+
+	LOG_INF("%s", __func__);
+
+	if (!access_token) {
+		LOG_INF("Access token missing, requesting provisioning");
+
+		err = modem_info_string_get(MODEM_INFO_ICCID, name, sizeof(name));
+		if (err < 0) {
+			LOG_ERR("Could not fetch ICCID");
+			return;
+		}
+
+		err = thingsboard_provision_device(name, prov_callback);
+		if (err) {
+			LOG_ERR("Could not provision device");
+			return;
+		}
+
+		return;
+	}
+
 	if (client_subscribe_to_attributes() != 0) {
 		LOG_ERR("Failed to observe attributes");
 	}
@@ -272,48 +309,6 @@ static void start_client(void) {
 	}
 }
 
-static const struct tb_fw_id *current_fw;
-
-static void prov_callback(const char *token) {
-	LOG_INF("Device provisioned");
-	access_token = token;
-	provisioned = true;
-
-	thingsboard_fota_init(access_token, current_fw);
-
-	if (confirm_fw_update() != 0) {
-		LOG_ERR("Failed to confirm FW update");
-	}
-
-	start_client();
-}
-
-void coap_client_setup_cb(void) {
-	LOG_INF("%s", __func__);
-	char name[30];
-	int err;
-
-	if (!initialized) {
-		err = modem_info_string_get(MODEM_INFO_ICCID, name, sizeof(name));
-		if (err < 0) {
-			LOG_ERR("Could not fetch ICCID");
-			return;
-		}
-
-		err = thingsboard_provision_device(name, prov_callback);
-		if (err) {
-			LOG_ERR("Could not provision device");
-			return;
-		}
-
-		initialized = true;
-	}
-
-	if (provisioned) {
-		start_client();
-	}
-}
-
 int thingsboard_init(attr_write_callback_t cb, const struct tb_fw_id *fw_id) {
 	attribute_cb = cb;
 	int ret;
@@ -324,7 +319,7 @@ int thingsboard_init(attr_write_callback_t cb, const struct tb_fw_id *fw_id) {
 
 	print_modem_info();
 
-	if (coap_client_init(coap_client_setup_cb) != 0) {
+	if (coap_client_init(start_client) != 0) {
 		LOG_ERR("Failed to initialize CoAP client");
 		return -1;
 	}
