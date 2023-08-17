@@ -60,7 +60,9 @@ static void client_handle_attribute_notification(struct coap_client_request *req
 		return;
 	}
 
+#ifdef CONFIG_THINGSBOARD_FOTA
 	thingsboard_check_fw_attributes(&attr);
+#endif
 
 	if (attribute_cb) {
 		attribute_cb(&attr);
@@ -259,11 +261,13 @@ static void prov_callback(const char *token) {
 	LOG_INF("Device provisioned");
 	access_token = token;
 
+#ifdef CONFIG_THINGSBOARD_FOTA
 	thingsboard_fota_init(access_token, current_fw);
 
 	if (confirm_fw_update() != 0) {
 		LOG_ERR("Failed to confirm FW update");
 	}
+#endif
 
 	start_client();
 }
