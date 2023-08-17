@@ -1,6 +1,9 @@
 menuconfig THINGSBOARD
     bool "Thingsboard library"
     depends on COAP
+    depends on NET_SOCKETS
+    depends on NET_SOCKETS_POSIX_NAMES
+    depends on JSON_LIBRARY
 
 if THINGSBOARD
 
