@@ -257,6 +257,8 @@ if __name__ == "__main__":
     if len(sys.argv) < 3:
         raise ValueError("Usage: <outpath> JSON schema file(s)...")
     outpath = sys.argv[1]
+    print(f"Generating JSON parsers to {outpath}")
+    os.makedirs(outpath, exist_ok=True)
 
     prop = load_schema(sys.argv[2])
     for path in sys.argv[3:]:
