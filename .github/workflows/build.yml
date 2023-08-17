@@ -28,4 +28,4 @@ jobs:
         shell: bash
         run: |
           source zephyr/zephyr-env.sh
-          zephyr/scripts/twister --testcase-root thingsboard
+          zephyr/scripts/twister -i --testcase-root thingsboard
