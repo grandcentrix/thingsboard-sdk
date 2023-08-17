@@ -1,0 +1,18 @@
+manifest:
+  defaults:
+    remote: github
+
+  remotes:
+    - name: github
+      url-base: https://github.com/
+
+  projects:
+    - name: nrf
+      remote: github
+      repo-path: nrfconnect/sdk-nrf
+      revision: v1.8.0
+      path: nrf
+      import: true
+
+  self:
+    path: modules/thingsboard
