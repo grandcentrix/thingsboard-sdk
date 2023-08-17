@@ -1,0 +1,15 @@
+manifest:
+  defaults:
+    remote: upstream
+
+  remotes:
+    - name: upstream
+      url-base: https://github.com/zephyrproject-rtos
+
+  projects:
+    - name: zephyr
+      path: zephyr
+      revision: v2.7.1
+
+  self:
+    path: modules/thingsboard

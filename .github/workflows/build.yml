@@ -1,0 +1,29 @@
+name: Build
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    container: ghcr.io/zephyrproject-rtos/ci:v0.26.2
+    env:
+      CMAKE_PREFIX_PATH: /opt/toolchains
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          path: thingsboard
+
+      - name: Initialize
+        run: |
+          west init -l thingsboard
+          west update -o=--depth=1 -n
+
+      - name: Twister Tests
+        run: |
+          source zephyr/zephyr-env.sh
+          zephyr/scripts/twister --testcase-root modules/thingsboard
