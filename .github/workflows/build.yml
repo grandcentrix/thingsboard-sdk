@@ -24,6 +24,8 @@ jobs:
           west update -o=--depth=1 -n
 
       - name: Twister Tests
+        # bash is needed for source to be working
+        shell: bash
         run: |
           source zephyr/zephyr-env.sh
-          zephyr/scripts/twister --testcase-root modules/thingsboard
+          zephyr/scripts/twister --testcase-root thingsboard
