@@ -7,6 +7,11 @@ menuconfig THINGSBOARD
 
 if THINGSBOARD
 
+config THINGSBOARD_FOTA
+    bool "Thingsboard FOTA support"
+    depends on DFU_TARGET_MCUBOOT
+    default y if DFU_TARGET_MCUBOOT
+
 config APP_MCUBOOT_FLASH_BUF_SZ
     int "Size of buffer used for flash write operations during MCUboot updates"
     depends on DFU_TARGET_MCUBOOT
