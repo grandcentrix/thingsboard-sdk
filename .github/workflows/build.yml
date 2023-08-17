@@ -23,6 +23,9 @@ jobs:
           west init -l thingsboard
           west update -o=--depth=1 -n
 
+      - name: Install Python Dependencies
+        run: pip install -r thingsboard/scripts/requirements.txt
+
       - name: Twister Tests
         # bash is needed for source to be working
         shell: bash
