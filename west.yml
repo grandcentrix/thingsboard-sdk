@@ -10,6 +10,7 @@ manifest:
     - name: zephyr
       path: zephyr
       revision: v2.7.1
+      import: true
 
   self:
     path: modules/thingsboard
