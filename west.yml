@@ -1,15 +1,17 @@
 manifest:
   defaults:
-    remote: upstream
+    remote: github
 
   remotes:
-    - name: upstream
-      url-base: https://github.com/zephyrproject-rtos
+    - name: github
+      url-base: https://github.com/
 
   projects:
-    - name: zephyr
-      path: zephyr
-      revision: v2.7.1
+    - name: nrf
+      remote: github
+      repo-path: nrfconnect/sdk-nrf
+      revision: v1.8.0
+      path: nrf
       import: true
 
   self:
