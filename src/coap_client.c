@@ -568,6 +568,11 @@ static void on_work(struct k_work* work) {
 		break;
 	case COAP_CLIENT_ERROR:
 		err = udp_teardown();
+		if (err < 0) {
+			/* If even this fails, better abort */
+			LOG_ERR("CoAP client fatally failed");
+			return;
+		}
 		break;
 	default:
 		err = -EINVAL;
