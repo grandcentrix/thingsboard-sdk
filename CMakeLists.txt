@@ -32,7 +32,6 @@ if(CONFIG_THINGSBOARD)
 
     zephyr_library_sources(
         src/coap_client.c
-        src/tb_fota.c
         src/thingsboard.c
         ${CMAKE_CURRENT_BINARY_DIR}/generated/thingsboard_attr_parser.c
     )
@@ -43,5 +42,14 @@ if(CONFIG_THINGSBOARD)
         ${CMAKE_CURRENT_BINARY_DIR}/generated/provision_response_parser.c
     )
 
+    zephyr_library_sources_ifdef(
+        CONFIG_THINGSBOARD_FOTA
+        src/tb_fota.c
+    )
+
     zephyr_include_directories(${CMAKE_CURRENT_BINARY_DIR}/generated)
+
+    if (NOT CONFIG_THINGSBOARD_FOTA)
+        message(WARNING "Thingsboard FOTA module is disabled!")
+    endif()
 endif()

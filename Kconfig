@@ -1,8 +1,16 @@
 menuconfig THINGSBOARD
     bool "Thingsboard library"
     depends on COAP
+    depends on NET_SOCKETS
+    depends on NET_SOCKETS_POSIX_NAMES
+    depends on JSON_LIBRARY
 
 if THINGSBOARD
+
+config THINGSBOARD_FOTA
+    bool "Thingsboard FOTA support"
+    depends on DFU_TARGET_MCUBOOT
+    default y if DFU_TARGET_MCUBOOT
 
 config APP_MCUBOOT_FLASH_BUF_SZ
     int "Size of buffer used for flash write operations during MCUboot updates"

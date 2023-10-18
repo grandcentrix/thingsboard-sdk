@@ -48,16 +48,12 @@ static SETTINGS_STATIC_HANDLER_DEFINE(token_settings_conf, "thingsboard", NULL,
 				      token_settings_set, NULL,
 				      token_settings_export);
 
-static int client_handle_prov_resp(const struct coap_packet *response,
-								   struct coap_reply *reply,
-								   const struct sockaddr *from) {
+static int client_handle_prov_resp(struct coap_client_request *req, struct coap_packet *response) {
 	uint8_t *payload;
 	uint16_t payload_len;
 	struct provision_response result = {0};
 	int err;
 	size_t tkl;
-
-	ARG_UNUSED(from);
 
 	LOG_INF("%s", __func__);
 
@@ -66,8 +62,6 @@ static int client_handle_prov_resp(const struct coap_packet *response,
 		LOG_WRN("Received empty provisioning response");
 		return -ENOMSG;
 	}
-
-	coap_reply_clear(reply);
 
 	err = provision_response_from_json(payload, payload_len, &result);
 	if (err < 0) {
