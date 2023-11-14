@@ -2,8 +2,8 @@
 
 #include <string.h>
 
-#include <kernel.h>
-#include <net/coap.h>
+#include <zephyr/kernel.h>
+#include <zephyr/net/coap.h>
 #include <thingsboard_attr_parser.h>
 #include <modem/at_cmd_parser.h>
 #include <modem/at_params.h>
@@ -14,7 +14,7 @@
 #include "tb_fota.h"
 #include "provision.h"
 
-#include <logging/log.h>
+#include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(thingsboard_client);
 
 static struct {
@@ -249,7 +249,7 @@ static void print_modem_info(void) {
 			return;
 		}
 		info_name[ret] = '\0';
-		LOG_INF("Value of %s is %s", log_strdup(info_name), log_strdup(modem_info));
+		LOG_INF("Value of %s is %s", info_name, modem_info);
 	}
 }
 

@@ -1,15 +1,15 @@
 #include "tb_fota.h"
 
-#include <kernel.h>
+#include <zephyr/kernel.h>
 #include "coap_client.h"
 #include "thingsboard.h"
-#include <sys/reboot.h>
+#include <zephyr/sys/reboot.h>
 #include <stdio.h>
 #include <dfu/mcuboot.h>
 #include <dfu/dfu_target_mcuboot.h>
 #include <thingsboard_attr_parser.h>
 
-#include <logging/log.h>
+#include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(tb_fota);
 
 static const struct tb_fw_id *current_fw;
@@ -320,7 +320,7 @@ void thingsboard_check_fw_attributes(struct thingsboard_attr *attr) {
 	strncpy(tb_fota_ctx.version, attr->fw_version, sizeof(tb_fota_ctx.version));
 	tb_fota_ctx.size = attr->fw_size;
 
-	LOG_INF("Target FW: %s - %s (%zu B)", log_strdup(attr->fw_title), log_strdup(attr->fw_version), attr->fw_size);
+	LOG_INF("Target FW: %s - %s (%zu B)", attr->fw_title, attr->fw_version, attr->fw_size);
 
 	thingsboard_start_fw_update();
 }
