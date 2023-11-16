@@ -1,6 +1,6 @@
 #include "example_parser.h"
 
-#include <data/json.h>
+#include <zephyr/data/json.h>
 
 static const struct json_obj_descr example_desc[] = {
 	JSON_OBJ_DESCR_PRIM(struct example, status, JSON_TOK_STRING),

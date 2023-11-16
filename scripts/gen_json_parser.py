@@ -229,7 +229,7 @@ def write_source(path, prop):
             f"""\
 #include "{prop.module_name() + ".h"}"
 
-#include <data/json.h>
+#include <zephyr/data/json.h>
 
 {prop.make_descriptors()}
 

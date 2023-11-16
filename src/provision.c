@@ -1,13 +1,13 @@
 #include "provision.h"
 
-#include <settings/settings.h>
+#include <zephyr/settings/settings.h>
 
 #include "coap_client.h"
 #include <provision_response_parser.h>
 
 #include <stdio.h>
 
-#include <logging/log.h>
+#include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(tb_provision);
 
 static token_callback token_cb;
@@ -75,7 +75,7 @@ static int client_handle_prov_resp(struct coap_client_request *req, struct coap_
 	}
 
 	if (strcmp(result.status, "SUCCESS") != 0) {
-		LOG_ERR("Provisioning was not successful: \"%s\"", log_strdup(result.status));
+		LOG_ERR("Provisioning was not successful: \"%s\"", result.status);
 		return -EBADMSG;
 	}
 
@@ -85,7 +85,7 @@ static int client_handle_prov_resp(struct coap_client_request *req, struct coap_
 	}
 
 	if (strcmp(result.credentialsType, "ACCESS_TOKEN") != 0) {
-		LOG_ERR("Got unexpected credentials type \"%s\"", log_strdup(result.credentialsType));
+		LOG_ERR("Got unexpected credentials type \"%s\"", result.credentialsType);
 		return -EBADMSG;
 	}
 

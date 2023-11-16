@@ -1,10 +1,10 @@
 #include "coap_client.h"
 
-#include <net/socket.h>
-#include <random/rand32.h>
+#include <zephyr/net/socket.h>
+#include <zephyr/random/rand32.h>
 #include <stdio.h>
 
-#include <logging/log.h>
+#include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(coap_client);
 
 #define APP_COAP_VERSION 1
@@ -56,7 +56,7 @@ static void client_state_set(enum coap_client_state state) {
 		return;
 	}
 
-	LOG_INF("CoAP client changed from state %s to %s", log_strdup(state_str(c_state)), log_strdup(state_str(state)));
+	LOG_INF("CoAP client changed from state %s to %s", state_str(c_state), state_str(state));
 
 	c_state = state;
 
@@ -379,7 +379,7 @@ static void receive(void *buf, size_t len) {
 
 	if (Z_LOG_CONST_LEVEL_CHECK(LOG_LEVEL_DBG)) {
 		res = zsock_inet_ntop(src.sa_family, &src, src_ip, sizeof(src_ip));
-		LOG_DBG("Received from %s", log_strdup(res));
+		LOG_DBG("Received from %s", res);
 	}
 
 	LOG_HEXDUMP_DBG(buf, received, "Received");
@@ -422,7 +422,7 @@ static int server_resolve(void)
 
 	inet_ntop(AF_INET, &server4->sin_addr.s_addr, ipv4_addr,
 		  sizeof(ipv4_addr));
-	LOG_INF("IPv4 Address found %s", log_strdup(ipv4_addr));
+	LOG_INF("IPv4 Address found %s", ipv4_addr);
 
 	/* Free the address. */
 	freeaddrinfo(result);
@@ -655,7 +655,7 @@ int coap_packet_append_uri_query_s(struct coap_packet *pkt, const char *fmt, con
 
 	err = snprintf(query, sizeof(query), fmt, s);
 	if (err < 0 || err >= sizeof(query)) {
-		LOG_ERR("Could not format \"%s\"", log_strdup(fmt));
+		LOG_ERR("Could not format \"%s\"", fmt);
 		return -ENOMEM;
 	}
 	return coap_packet_append_option(pkt, COAP_OPTION_URI_QUERY, query, err);
@@ -667,7 +667,7 @@ int coap_packet_append_uri_query_d(struct coap_packet *pkt, const char *fmt, int
 
 	err = snprintf(query, sizeof(query), fmt, d);
 	if (err < 0 || err >= sizeof(query)) {
-		LOG_ERR("Could not format \"%s\"", log_strdup(fmt));
+		LOG_ERR("Could not format \"%s\"", fmt);
 		return -ENOMEM;
 	}
 

@@ -1,8 +1,8 @@
 #ifndef COAP_CLIENT_H
 #define COAP_CLIENT_H
 
-#include <net/coap.h>
-#include <sys/dlist.h>
+#include <zephyr/net/coap.h>
+#include <zephyr/sys/dlist.h>
 
 struct coap_client_request;
 

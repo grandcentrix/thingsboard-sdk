@@ -9,7 +9,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-22.04
-    container: ghcr.io/zephyrproject-rtos/ci:v0.23.3
+    container: ghcr.io/zephyrproject-rtos/ci:v0.26.5
     env:
       CMAKE_PREFIX_PATH: /opt/toolchains
     steps:
@@ -31,4 +31,4 @@ jobs:
         shell: bash
         run: |
           source zephyr/zephyr-env.sh
-          zephyr/scripts/twister -i --testcase-root thingsboard
+          zephyr/scripts/twister -i -T thingsboard
