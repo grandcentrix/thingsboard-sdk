@@ -3,6 +3,33 @@ This module is an SDK to interface a Zephyr-based project with an instance of ht
 
 This module uses RPC calls to fetch the current time stamp from the server. You have to implement this RPC call in your rule chain for this to work. An example implementation can be found when you import `root_rule_chain.json` into your Thingsboard tenant.
 
+## Installation
+This is a Zephyr module, so just include it into your project's west.yml. It comes with the correct nRF SDK version included, so you need to use `import:true`.
+
+#### **`west.yml`**
+```yml
+manifest:
+  remotes:
+    - name: gcx
+      url-base: ssh://git@github.com/GCX-EMBEDDED
+  projects:
+    - name: thingsboard-sdk
+      remote: gcx
+      revision: v2.5.0
+      path: modules/thingsboard
+      import: true
+  self:
+    path: my-project
+```
+
+This is the minimal manifest that you need to use in your project.
+
+### Requirements
+Besides the typical Zephyr toolchain, this module comes with its own build-time Python requirements. Install with pip:
+```sh
+pip install -r thingsboard/scripts/requirements.txt
+```
+
 ## Functionality
 Please make sure to have read and understood https://thingsboard.io/docs/.
 
