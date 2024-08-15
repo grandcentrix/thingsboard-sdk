@@ -15,7 +15,7 @@ manifest:
   projects:
     - name: thingsboard-sdk
       remote: gcx
-      revision: v2.5.0
+      revision: v2.7.0
       path: modules/thingsboard
       import: true
   self:

@@ -1,8 +1,8 @@
 #include "coap_client.h"
 
-#include <zephyr/net/socket.h>
-#include <zephyr/random/rand32.h>
 #include <stdio.h>
+#include <zephyr/net/socket.h>
+#include <zephyr/random/random.h>
 
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(coap_client);

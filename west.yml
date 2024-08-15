@@ -10,7 +10,7 @@ manifest:
     - name: nrf
       remote: github
       repo-path: nrfconnect/sdk-nrf
-      revision: v2.5.0
+      revision: v2.7.0
       path: nrf
       import: true
 
