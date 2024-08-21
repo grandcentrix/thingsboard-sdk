@@ -6,7 +6,7 @@
 
 struct coap_client_request;
 
-typedef void (*coap_reply_handler_t)(struct coap_client_request *req, struct coap_packet *resp);
+typedef int (*coap_reply_handler_t)(struct coap_client_request *req, struct coap_packet *resp);
 
 struct coap_client_request {
     struct coap_packet pkt;

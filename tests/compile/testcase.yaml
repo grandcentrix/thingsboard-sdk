@@ -1,3 +1,13 @@
+common:
+  platform_allow:
+    - qemu_cortex_m3
+    - native_posix
 tests:
-  thingsboard.compile:
-    platform_allow: qemu_cortex_m3
+  thingsboard.compile: {}
+  thingsboard.compile_provisioning:
+    extra_configs:
+      - CONFIG_THINGSBOARD_USE_PROVISIONING=y
+      - CONFIG_SETTINGS=y
+  thingsboard.compile_fota:
+    extra_configs:
+      - CONFIG_THINGSBOARD_FOTA=y

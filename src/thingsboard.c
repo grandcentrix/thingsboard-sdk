@@ -36,7 +36,8 @@ K_WORK_DELAYABLE_DEFINE(work_time, time_worker);
 
 static const char *access_token;
 
-static void client_handle_attribute_notification(struct coap_client_request *req, struct coap_packet *response)
+static int client_handle_attribute_notification(struct coap_client_request *req,
+						struct coap_packet *response)
 {
 	LOG_INF("%s", __func__);
 
@@ -50,14 +51,14 @@ static void client_handle_attribute_notification(struct coap_client_request *req
 	payload = (uint8_t*)coap_packet_get_payload(response, &payload_len);
 	if (!payload_len) {
 		LOG_WRN("Received empty attributes");
-		return;
+		return payload_len;
 	}
 	LOG_HEXDUMP_DBG(payload, payload_len, "Received attributes");
 
 	err = thingsboard_attr_from_json(payload, payload_len, &attr);
 	if (err < 0) {
 		LOG_ERR("Parsing attributes failed");
-		return;
+		return err;
 	}
 
 #ifdef CONFIG_THINGSBOARD_FOTA
@@ -67,6 +68,7 @@ static void client_handle_attribute_notification(struct coap_client_request *req
 	if (attribute_cb) {
 		attribute_cb(&attr);
 	}
+	return 0;
 }
 
 /**
@@ -99,7 +101,8 @@ static int timestamp_from_buf(int64_t *value, const void *buf, size_t sz) {
 	return 0;
 }
 
-static void client_handle_time_response(struct coap_client_request *req, struct coap_packet *response)
+static int client_handle_time_response(struct coap_client_request *req,
+				       struct coap_packet *response)
 {
 	int64_t ts = 0;
 	const uint8_t *payload;
@@ -111,19 +114,20 @@ static void client_handle_time_response(struct coap_client_request *req, struct 
 	payload = coap_packet_get_payload(response, &payload_len);
 	if (!payload_len) {
 		LOG_WRN("Received empty timestamp");
-		return;
+		return payload_len;
 	}
 
 	err = timestamp_from_buf(&ts, payload, payload_len);
 	if (err) {
 		LOG_ERR("Parsing of time response failed");
-		return;
+		return err;
 	}
 
 	tb_time.tb_time = ts;
 	tb_time.own_time = k_uptime_get();
 
 	k_sem_give(&time_sem);
+	return 0;
 }
 
 static int client_subscribe_to_attributes(void)
