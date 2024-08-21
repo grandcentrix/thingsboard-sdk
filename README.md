@@ -48,6 +48,7 @@ static void handle_attr_update(struct thingsboard_attr *attr) {
 int main() {
     fw_id.fw_title = "my-app";
     fw_id.fw_version = fw_version_str;
+    fw_id.device_name = device_name;
 
     thingsboard_init(handle_attr_update, &fw_id);
 }

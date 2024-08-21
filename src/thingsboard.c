@@ -224,20 +224,13 @@ static void prov_callback(const char *token) {
 
 static void start_client(void) {
 	int err;
-	char name[30];
 
 	LOG_INF("%s", __func__);
 
 	if (!access_token) {
 		LOG_INF("Access token missing, requesting provisioning");
 
-		err = modem_info_string_get(MODEM_INFO_ICCID, name, sizeof(name));
-		if (err < 0) {
-			LOG_ERR("Could not fetch ICCID");
-			return;
-		}
-
-		err = thingsboard_provision_device(name, prov_callback);
+		err = thingsboard_provision_device(current_fw->device_name, prov_callback);
 		if (err) {
 			LOG_ERR("Could not provision device");
 			return;
