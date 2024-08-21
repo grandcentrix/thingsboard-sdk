@@ -54,7 +54,13 @@ int main() {
 ```
 
 ### Connecting
-The module takes care of modem enabling, socket creating and connecting to the server automatically. You just have to configure URL and port of the Thingsboard CoAP server, using `config COAP_CLIENT_NUM_MSGS` and `config COAP_CLIENT_MSG_LEN`. CoAP reliability can be fine-tuned using `config COAP_NUM_RETRIES` and the Zephyr-internal `config COAP_INIT_ACK_TIMEOUT_MS`. Using NB-IoT, 15000 is a good starting value for the latter.
+
+The module takes care of socket creating and connecting to the server automatically. You just have
+to configure URL and port of the Thingsboard CoAP server, using `config COAP_CLIENT_NUM_MSGS` and
+`config COAP_CLIENT_MSG_LEN`.
+
+CoAP reliability can be fine-tuned using `config COAP_NUM_RETRIES` and the Zephyr-internal
+`config COAP_INIT_ACK_TIMEOUT_MS`. Using NB-IoT, 15000 is a good starting value for the latter.
 
 ### Sending telemetry to cloud
 ```c

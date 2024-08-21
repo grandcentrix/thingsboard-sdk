@@ -5,10 +5,6 @@
 #include <zephyr/kernel.h>
 #include <zephyr/net/coap.h>
 #include <thingsboard_attr_parser.h>
-#include <modem/at_cmd_parser.h>
-#include <modem/at_params.h>
-#include <modem/lte_lc.h>
-#include <modem/modem_info.h>
 
 #include "coap_client.h"
 #include "tb_fota.h"
@@ -194,24 +190,6 @@ static void time_worker(struct k_work *work) {
 	k_work_schedule(&work_time, K_MSEC(TIME_RETRY_INTERVAL));
 }
 
-static void modem_configure(void)
-{
-#if defined(CONFIG_LTE_LINK_CONTROL)
-	if (IS_ENABLED(CONFIG_LTE_AUTO_INIT_AND_CONNECT)) {
-		/* Do nothing, modem is already turned on
-		 * and connected.
-		 */
-	} else {
-		int err;
-
-		LOG_INF("LTE Link Connecting ...");
-		err = lte_lc_init_and_connect();
-		__ASSERT(err == 0, "LTE link could not be established.");
-		LOG_INF("LTE Link Connected!");
-	}
-#endif /* defined(CONFIG_LTE_LINK_CONTROL) */
-}
-
 int thingsboard_send_telemetry(const void *payload, size_t sz) {
 	int err;
 
@@ -223,38 +201,6 @@ int thingsboard_send_telemetry(const void *payload, size_t sz) {
 	}
 
 	return 0;
-}
-
-static void print_modem_info(void) {
-	char info_name[50];
-	char modem_info[50];
-
-	enum modem_info infos[] = {
-		MODEM_INFO_FW_VERSION,
-		MODEM_INFO_UICC,
-		MODEM_INFO_IMSI,
-		MODEM_INFO_ICCID,
-		MODEM_INFO_APN,
-		MODEM_INFO_IP_ADDRESS
-	};
-
-	int ret;
-
-	for (size_t i = 0; i < ARRAY_SIZE(infos); i++) {
-		ret = modem_info_string_get(infos[i],
-						modem_info,
-						sizeof(modem_info));
-		if (ret < 0) {
-			return;
-		}
-		ret = modem_info_name_get(infos[i],
-						info_name);
-		if (ret < 0 || ret > sizeof(info_name)) {
-			return;
-		}
-		info_name[ret] = '\0';
-		LOG_INF("Value of %s is %s", info_name, modem_info);
-	}
 }
 
 static void start_client(void);
@@ -318,10 +264,6 @@ int thingsboard_init(attr_write_callback_t cb, const struct tb_fw_id *fw_id) {
 	int ret;
 
 	current_fw = fw_id;
-
-	modem_configure();
-
-	print_modem_info();
 
 	if (coap_client_init(start_client) != 0) {
 		LOG_ERR("Failed to initialize CoAP client");
