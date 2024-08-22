@@ -5,9 +5,11 @@ common:
 tests:
   thingsboard.compile: {}
   thingsboard.compile_provisioning:
+    build_only: true
     extra_configs:
       - CONFIG_THINGSBOARD_USE_PROVISIONING=y
       - CONFIG_SETTINGS=y
   thingsboard.compile_fota:
+    build_only: true
     extra_configs:
       - CONFIG_THINGSBOARD_FOTA=y
