@@ -70,7 +70,7 @@ static void coap_client_request_free(struct coap_client_request *req) {
 	if (sys_dnode_is_linked(&req->node)) {
 		sys_dlist_remove(&req->node);
 	}
-	k_mem_slab_free(&coap_msg_slab, &block);
+	k_mem_slab_free(&coap_msg_slab, block);
 }
 
 struct coap_client_request *coap_client_request_alloc(uint8_t type, uint8_t code) {
