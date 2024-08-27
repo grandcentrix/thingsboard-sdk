@@ -19,6 +19,7 @@ static K_THREAD_STACK_DEFINE(udp_stack, STACKSIZE);
 static struct k_thread udp_thread;
 #endif // CONFIG_THINGSBOARD_TEST_FAILURE
 static bool keep_running;
+K_SEM_DEFINE(time_request_sem, 1, 1);
 
 #define COAP_ATTRIBUTES_PATH ((const char *const[]){"api", "v1", "+", "attributes", NULL})
 #define COAP_RPC_PATH        ((const char *const[]){"api", "v1", "+", "rpc", NULL})
@@ -91,6 +92,7 @@ void mock_udp_server_thread(void *p1, void *p2, void *p3)
 					   addrlen);
 			zassert_equal(ret, response.offset, "Could not send all data");
 			LOG_INF("Responded to time package");
+			k_sem_give(&time_request_sem);
 		}
 	}
 
@@ -119,12 +121,19 @@ ZTEST(thingsboard, test_thingsboard_init)
 
 	ret = thingsboard_init(attr_write_callback, &fw_id);
 	zassert_equal(ret, 0, "Unexpected return value %d", ret);
-	keep_running = false;
 
 	time_t tb_ms = thingsboard_time_msec();
 	zassert_true(tb_ms >= COAP_TEST_TIME, "Time is less then what we provided!");
 	uint64_t now_ms = k_uptime_get();
 	zassert_true(tb_ms <= COAP_TEST_TIME + now_ms, "Time is higher then what we expect!");
+
+	// reset the time semaphore to a taken state.
+	k_sem_take(&time_request_sem, K_NO_WAIT);
+	// Wait for next time request.
+	ret = k_sem_take(&time_request_sem,
+			 K_SECONDS((CONFIG_THINGSBOARD_TIME_REFRESH_INTERVAL_SECONDS + 1)));
+	zassert_equal(ret, 0, "Did not receive a time request in time.");
+	keep_running = false;
 }
 #endif // CONFIG_THINGSBOARD_TEST_FAILURE
 
