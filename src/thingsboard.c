@@ -238,9 +238,10 @@ int thingsboard_init(attr_write_callback_t cb, const struct tb_fw_id *fw_id) {
 
 	current_fw = fw_id;
 
-	if (coap_client_init(start_client) != 0) {
-		LOG_ERR("Failed to initialize CoAP client");
-		return -1;
+	ret = coap_client_init(start_client);
+	if (ret != 0) {
+		LOG_ERR("Failed to initialize CoAP client (%d)", ret);
+		return ret;
 	}
 
 	LOG_INF("Waiting for Timestamp...");

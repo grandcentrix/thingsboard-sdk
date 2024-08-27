@@ -4,6 +4,9 @@ common:
     - native_posix
 tests:
   thingsboard.compile: {}
+  thingsboard.failure:
+    extra_configs:
+      - CONFIG_THINGSBOARD_TEST_FAILURE=y
   thingsboard.compile_provisioning:
     build_only: true
     extra_configs:
