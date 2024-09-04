@@ -23,12 +23,8 @@ K_SEM_DEFINE(time_sem, 0, 1);
 
 static attr_write_callback_t attribute_cb;
 
-#define TIME_RETRY_INTERVAL 10000U
-#define TIME_REFRESH_INTERVAL 3600000U
-
-static void time_worker(struct k_work *work);
-
-K_WORK_DELAYABLE_DEFINE(work_time, time_worker);
+static void client_request_time(struct k_work *work);
+K_WORK_DELAYABLE_DEFINE(work_time, client_request_time);
 
 static const char *access_token;
 
@@ -122,6 +118,9 @@ static int client_handle_time_response(struct coap_client_request *req,
 	tb_time.tb_time = ts;
 	tb_time.own_time = k_uptime_get();
 
+	/* schedule a refresh request for later. */
+	k_work_reschedule(&work_time, K_SECONDS(CONFIG_THINGSBOARD_TIME_REFRESH_INTERVAL_SECONDS));
+
 	k_sem_give(&time_sem);
 	return 0;
 }
@@ -157,7 +156,8 @@ static int client_subscribe_to_attributes(void)
 	return 0;
 }
 
-static int client_request_time(void) {
+static void client_request_time(struct k_work *work)
+{
 	int err;
 
 	static const char *payload = "{\"method\": \"getCurrentTime\", \"params\": {}}";
@@ -166,28 +166,12 @@ static int client_request_time(void) {
 	err = coap_client_make_request(uri, payload, strlen(payload), COAP_TYPE_CON, COAP_METHOD_POST, client_handle_time_response);
 	if (err) {
 		LOG_ERR("Failed to request time");
-		return err;
 	}
 
 	tb_time.last_request = k_uptime_get();
 
-	return 0;
-}
-
-static void time_worker(struct k_work *work) {
-	ARG_UNUSED(work);
-
-	int64_t since_last_request = k_uptime_get() - tb_time.last_request;
-
-	// Request is due
-	if ((!tb_time.last_request) ||
-		(since_last_request >= TIME_REFRESH_INTERVAL) ||
-		(tb_time.last_request > tb_time.own_time
-			&& since_last_request >= TIME_RETRY_INTERVAL)) {
-		client_request_time();
-	}
-
-	k_work_schedule(&work_time, K_MSEC(TIME_RETRY_INTERVAL));
+	// Fallback to ask for time, if we don't receive a response.
+	k_work_reschedule(k_work_delayable_from_work(work), K_SECONDS(10));
 }
 
 int thingsboard_send_telemetry(const void *payload, size_t sz) {
@@ -243,11 +227,7 @@ static void start_client(void) {
 		LOG_ERR("Failed to observe attributes");
 	}
 
-	if (client_request_time() != 0) {
-		LOG_ERR("Failed to request time");
-	}
-
-	if (k_work_schedule(&work_time, K_NO_WAIT) < 0) {
+	if (k_work_reschedule(&work_time, K_NO_WAIT) < 0) {
 		LOG_ERR("Failed to schedule time worker!");
 	}
 }
@@ -258,15 +238,17 @@ int thingsboard_init(attr_write_callback_t cb, const struct tb_fw_id *fw_id) {
 
 	current_fw = fw_id;
 
-	if (coap_client_init(start_client) != 0) {
-		LOG_ERR("Failed to initialize CoAP client");
-		return -1;
+	ret = coap_client_init(start_client);
+	if (ret != 0) {
+		LOG_ERR("Failed to initialize CoAP client (%d)", ret);
+		return ret;
 	}
 
 	LOG_INF("Waiting for Timestamp...");
 	ret = k_sem_take(&time_sem, K_SECONDS(10));
 	if (ret < 0) {
 		LOG_ERR("Failed to wait for timestamp: %d", ret);
+		return ret;
 	}
 
 	return 0;
