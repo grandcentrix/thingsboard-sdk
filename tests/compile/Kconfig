@@ -1,0 +1,5 @@
+
+config THINGSBOARD_TEST_FAILURE
+    bool "test the failure cases"
+
+source "Kconfig.zephyr"

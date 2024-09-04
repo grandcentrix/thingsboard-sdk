@@ -3,7 +3,12 @@ common:
     - qemu_cortex_m3
     - native_posix
 tests:
-  thingsboard.compile: {}
+  thingsboard.compile:
+    extra_configs:
+      - CONFIG_THINGSBOARD_TIME_REFRESH_INTERVAL_SECONDS=5
+  thingsboard.failure:
+    extra_configs:
+      - CONFIG_THINGSBOARD_TEST_FAILURE=y
   thingsboard.compile_provisioning:
     build_only: true
     extra_configs:

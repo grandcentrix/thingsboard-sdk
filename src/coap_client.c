@@ -608,6 +608,10 @@ int coap_client_init(void (*cb)(void))
 
 	active_cb = cb;
 
+	if (requests.head) {
+		return -EALREADY;
+	}
+
 	sys_dlist_init(&requests);
 
 	err = server_resolve();

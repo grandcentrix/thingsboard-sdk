@@ -53,6 +53,10 @@ config THINGSBOARD_ACCESS_TOKEN
   prompt "Device Access Token" if !THINGSBOARD_USE_PROVISIONING
   default ""
 
+config THINGSBOARD_TIME_REFRESH_INTERVAL_SECONDS
+    int "Interval in seconds between time refresh"
+    default 3600
+
 config THINGSBOARD_FOTA_CHUNK_SIZE
     int "Chunk size for FOTA updates"
     default 1024
