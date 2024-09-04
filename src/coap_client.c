@@ -82,7 +82,7 @@ struct coap_client_request *coap_client_request_alloc(uint8_t type, uint8_t code
 
 	err = k_mem_slab_alloc(&coap_msg_slab, &block, K_NO_WAIT);
 	if (err < 0) {
-		LOG_ERR("Could not allocate memory for request");
+		LOG_ERR("Could not allocate memory for request, error (%d): %s", err, strerror(-err));
 		return NULL;
 	}
 
@@ -123,7 +123,7 @@ int coap_client_request_observe(struct coap_client_request *req) {
 
 static int send_raw(void *buf, size_t len) {
 	if (sendto(coap_socket, buf, len, 0, (struct sockaddr*)&server, sizeof(struct sockaddr_in)) < 0) {
-		LOG_ERR("Failed to send: %d", errno);
+		LOG_ERR("Failed to send, error (%d): %s", errno, strerror(errno));
 		return -errno;
 	}
 
@@ -134,11 +134,11 @@ static int client_send_request(struct coap_client_request *req) {
 	int err;
 
 	LOG_INF("Sending %s request %p (message id %d), %u retries left",
-		req->confirmable ? "confirmable" : "non-confirmable", req, req->id req->retries);
+		req->confirmable ? "confirmable" : "non-confirmable", req, req->id, req->retries);
 
 	err = send_raw(req->pkt.data, req->pkt.offset);
 	if (err < 0) {
-		LOG_ERR("Error sending request: %d", err);
+		LOG_ERR("Error sending request %p", req);
 	}
 
 	return err;
@@ -203,20 +203,20 @@ int coap_client_make_request(const uint8_t** uri, const void *payload, size_t pl
 
 	err = coap_packet_append_uri_path(&req->pkt, uri);
 	if (err < 0) {
-		LOG_ERR("Could not append URI path");
+		LOG_ERR("Could not append URI path, error (%d): %s", err, strerror(-err));
 		goto cleanup;
 	}
 
 	if (payload && plen) {
 		err = coap_packet_append_payload_marker(&req->pkt);
 		if (err) {
-			LOG_ERR("Could not append payload marker");
+			LOG_ERR("Could not append payload marker, error (%d): %s", err, strerror(-err));
 			goto cleanup;
 		}
 
 		err = coap_packet_append_payload(&req->pkt, payload, plen);
 		if (err < 0) {
-			LOG_ERR("Failed to append payload, %d", err);
+			LOG_ERR("Failed to append payload, error (%d): %s", err, strerror(-err));
 			goto cleanup;
 		}
 	}
@@ -240,7 +240,7 @@ static int client_ack_message(struct coap_packet *response) {
 			0, NULL,
 			0, msg_id);
 	if (err) {
-		LOG_ERR("Could not initialize ack");
+		LOG_ERR("Could not initialize ack, error (%d): %s", err, strerror(-err));
 		return err;
 	}
 
@@ -259,7 +259,7 @@ static int client_reset_message(struct coap_packet *response) {
 			0, NULL,
 			0, msg_id);
 	if (err) {
-		LOG_ERR("Could not initialize reset");
+		LOG_ERR("Could not initialize reset, error (%d): %s", err, strerror(-err));
 		return err;
 	}
 
@@ -292,7 +292,7 @@ static int client_handle_get_response(uint8_t *buf, int received, struct sockadd
 
 	err = coap_packet_parse(&response, buf, received, NULL, 0);
 	if (err < 0) {
-		LOG_ERR("Malformed response received: %d", err);
+		LOG_ERR("Malformed response received, error (%d): %s", err, strerror(-err));
 		return err;
 	}
 
@@ -387,7 +387,7 @@ static void receive(void *buf, size_t len) {
 		if (errno == EAGAIN || errno == EWOULDBLOCK) {
 			return;
 		}
-		LOG_ERR("Socket error");
+		LOG_ERR("Socket error (%d): %s", errno, strerror(errno));
 		return;
 	}
 
@@ -405,7 +405,7 @@ static void receive(void *buf, size_t len) {
 
 	err = client_handle_get_response(buf, received, &src);
 	if (err < 0) {
-		LOG_ERR("Invalid response, exit...");
+		LOG_ERR("Failed to handle response");
 		return;
 	}
 }
@@ -422,7 +422,7 @@ static int server_resolve(void)
 
 	err = getaddrinfo(CONFIG_COAP_SERVER_HOSTNAME, NULL, &hints, &result);
 	if (err != 0) {
-		LOG_ERR("ERROR: getaddrinfo failed %d", err);
+		LOG_ERR("ERROR: getaddrinfo failed, error %d: (%s)", err, strerror(-errno));
 		return -EIO;
 	}
 
@@ -462,7 +462,7 @@ static int udp_setup(void) {
 
 	coap_socket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
 	if (coap_socket < 0) {
-		LOG_ERR("Failed to create CoAP socket: %d.\n", errno);
+		LOG_ERR("Failed to create CoAP socket,error (%d): %s", errno, strerror(errno));
 		return -errno;
 	}
 
@@ -474,7 +474,7 @@ static int udp_setup(void) {
 	 */
 	err = bind(coap_socket, (struct sockaddr *)&src, sizeof(src));
 	if (err < 0) {
-		LOG_ERR("bind failed : %d", errno);
+		LOG_ERR("bind failed, error (%d): %s", errno, strerror(errno));
 		err = -errno;
 		/* Ignore possible errors, there is nothing we can do */
 		zsock_close(coap_socket);
@@ -492,7 +492,7 @@ static int udp_teardown(void) {
 
 	err = zsock_close(coap_socket);
 	if (err) {
-		LOG_ERR("Failed to close socket: %d", err);
+		LOG_ERR("Failed to close socket, error (%d): %s", err, strerror(err));
 		return err;
 	}
 
@@ -602,8 +602,9 @@ static void on_work(struct k_work* work) {
 		client_state_set(COAP_CLIENT_ERROR);
 	}
 
-	if (k_work_schedule(&work_coap, APP_RECEIVE_INTERVAL) < 0) {
-		LOG_ERR("Failed to schedule receiver!");
+	err = k_work_schedule(&work_coap, APP_RECEIVE_INTERVAL);
+	if (err < 0) {
+		LOG_ERR("Failed to schedule receiver, error (%d): %s", err, strerror(-err));
 	}
 }
 
@@ -639,15 +640,16 @@ int coap_client_init(void (*cb)(void))
 		return err;
 	}
 
-	if (k_work_schedule(&work_coap, APP_RECEIVE_INTERVAL) < 0) {
-		LOG_ERR("Failed to schedule receiver!");
+	err = k_work_schedule(&work_coap, APP_RECEIVE_INTERVAL);
+	if (err < 0) {
+		LOG_ERR("Failed to schedule receiver, error (%d): %s", err, strerror(-err));
 		return -1;
 	}
 
 #if CONFIG_COAP_CLIENT_STAT_INTERVAL_SECONDS > 0
 	err = k_work_schedule(&stat_work, K_SECONDS(CONFIG_COAP_CLIENT_STAT_INTERVAL_SECONDS));
 	if (err < 0) {
-		LOG_ERR("Failed to schedule stats! (%d)", err);
+		LOG_ERR("Failed to schedule statistics, error (%d): %s", err, strerror(-err));
 		return err;
 	}
 #endif
@@ -664,7 +666,6 @@ int coap_packet_append_uri_path(struct coap_packet *pkt, const uint8_t **uri)
 						*uri,
 						strlen(*uri));
 		if (err < 0) {
-			LOG_ERR("Failed to encode CoAP option, %d", err);
 			return err;
 		}
 		uri++;
