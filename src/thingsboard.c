@@ -267,6 +267,7 @@ int thingsboard_init(attr_write_callback_t cb, const struct tb_fw_id *fw_id) {
 	ret = k_sem_take(&time_sem, K_SECONDS(10));
 	if (ret < 0) {
 		LOG_ERR("Failed to wait for timestamp: %d", ret);
+		return ret;
 	}
 
 	return 0;
