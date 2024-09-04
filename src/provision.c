@@ -145,6 +145,12 @@ int thingsboard_provision_device(const char *device_name, token_callback cb) {
 
 	token_cb = cb;
 
+	err = settings_subsys_init();
+	if (err) {
+		LOG_ERR("Failed to initialize settings subsystem, error (%d): %s", err, strerror(-err));
+		return err;
+	}
+
 	err = settings_load();
 	if (err) {
 		LOG_ERR("Could not load settings");
