@@ -23,6 +23,14 @@ config COAP_CLIENT_NUM_MSGS
     int "Maximum number of CoAP messages"
     default 10
 
+config COAP_CLIENT_STAT_INTERVAL_SECONDS
+    int "Interval in seconds between stat printouts"
+    default 30 if LOG
+    default 0
+    help
+      Prints out statistics about resource usage on a regular interval.
+      Set to 0 to deactivate.
+
 config COAP_CLIENT_MSG_LEN
     int "Maximum length of CoAP messages"
     default 1280
@@ -44,6 +52,10 @@ config THINGSBOARD_ACCESS_TOKEN
   string
   prompt "Device Access Token" if !THINGSBOARD_USE_PROVISIONING
   default ""
+
+config THINGSBOARD_TIME_REFRESH_INTERVAL_SECONDS
+    int "Interval in seconds between time refresh"
+    default 3600
 
 config THINGSBOARD_FOTA_CHUNK_SIZE
     int "Chunk size for FOTA updates"

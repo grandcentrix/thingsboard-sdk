@@ -588,27 +588,29 @@ static void on_work(struct k_work* work) {
 	}
 }
 
-static void statistics(struct k_work *work);
-
-K_WORK_DELAYABLE_DEFINE(stat_work, statistics);
-
+#if CONFIG_COAP_CLIENT_STAT_INTERVAL_SECONDS > 0
 static void statistics(struct k_work *work) {
 	uint32_t mem_free;
-
-	ARG_UNUSED(work);
 
 	mem_free = k_mem_slab_num_free_get(&coap_msg_slab);
 
 	LOG_INF("CoAP stats: free: %u requests", mem_free);
 
-	k_work_schedule(&stat_work, K_SECONDS(30));
+	k_work_schedule(k_work_delayable_from_work(work),
+			K_SECONDS(CONFIG_COAP_CLIENT_STAT_INTERVAL_SECONDS));
 }
+K_WORK_DELAYABLE_DEFINE(stat_work, statistics);
+#endif
 
 int coap_client_init(void (*cb)(void))
 {
 	int err;
 
 	active_cb = cb;
+
+	if (requests.head) {
+		return -EALREADY;
+	}
 
 	sys_dlist_init(&requests);
 
@@ -623,10 +625,13 @@ int coap_client_init(void (*cb)(void))
 		return -1;
 	}
 
-	if (k_work_schedule(&stat_work, K_SECONDS(30)) < 0) {
-		LOG_ERR("Failed to schedule stats!");
-		return -1;
+#if CONFIG_COAP_CLIENT_STAT_INTERVAL_SECONDS > 0
+	err = k_work_schedule(&stat_work, K_SECONDS(CONFIG_COAP_CLIENT_STAT_INTERVAL_SECONDS));
+	if (err < 0) {
+		LOG_ERR("Failed to schedule stats! (%d)", err);
+		return err;
 	}
+#endif
 
 	return 0;
 }
