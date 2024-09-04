@@ -133,7 +133,9 @@ static int send_raw(void *buf, size_t len) {
 static int client_send_request(struct coap_client_request *req) {
 	int err;
 
-	LOG_INF("Sending request %p, %u retries left", req, req->retries);
+	LOG_INF("Sending %s request %p (message id %d), %u retries left",
+		req->confirmable ? "confirmable" : "non-confirmable", req, req->id req->retries);
+
 	err = send_raw(req->pkt.data, req->pkt.offset);
 	if (err < 0) {
 		LOG_ERR("Error sending request: %d", err);
@@ -264,12 +266,25 @@ static int client_reset_message(struct coap_packet *response) {
 	return send_raw(reset.data, reset.offset);
 }
 
+static void decode_response_code(int code, int *class, int *detail) {
+	*class = (code >> 5);
+	*detail = code & 0x1f;
+}
+
+static void response_code_to_str(int code, char str[5]) {
+	int class, detail;
+	decode_response_code(code, &class, &detail);
+	sprintf(str, "%1d.%02d", class, detail);
+}
+
+
 static int client_handle_get_response(uint8_t *buf, int received, struct sockaddr *from)
 {
 	int err;
 	struct coap_packet response;
 	struct coap_client_request *r, *rs;
 	uint8_t code;
+	char code_str[5];
 	uint8_t type;
 	uint16_t id;
 	uint8_t token[COAP_TOKEN_MAX_LEN];
@@ -286,7 +301,11 @@ static int client_handle_get_response(uint8_t *buf, int received, struct sockadd
 	id = coap_header_get_id(&response);
 	tkl = coap_header_get_token(&response, token);
 
-	if (type == COAP_TYPE_ACK && code == 0) {
+
+	response_code_to_str(code, code_str);
+	LOG_INF("Received CoAP message: type %d, code %s, message id %d", type, code_str, id);
+
+	if (type == COAP_TYPE_ACK && code == COAP_CODE_EMPTY) {
 		/*
 		 * This is an empty ACK message. It is matched
 		 * to the original request by the message ID.
