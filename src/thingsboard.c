@@ -212,7 +212,7 @@ static void start_client(void) {
 	LOG_INF("%s", __func__);
 
 	if (!access_token) {
-		LOG_INF("Access token missing, requesting provisioning");
+		LOG_INF("No access token in storage. Requesting provisioning.");
 
 		err = thingsboard_provision_device(current_fw->device_name, prov_callback);
 		if (err) {
