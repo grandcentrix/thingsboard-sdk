@@ -5,10 +5,6 @@
 #include <zephyr/kernel.h>
 #include <zephyr/net/coap.h>
 #include <thingsboard_attr_parser.h>
-#include <modem/at_cmd_parser.h>
-#include <modem/at_params.h>
-#include <modem/lte_lc.h>
-#include <modem/modem_info.h>
 
 #include "coap_client.h"
 #include "tb_fota.h"
@@ -36,7 +32,8 @@ K_WORK_DELAYABLE_DEFINE(work_time, time_worker);
 
 static const char *access_token;
 
-static void client_handle_attribute_notification(struct coap_client_request *req, struct coap_packet *response)
+static int client_handle_attribute_notification(struct coap_client_request *req,
+						struct coap_packet *response)
 {
 	LOG_INF("%s", __func__);
 
@@ -50,14 +47,14 @@ static void client_handle_attribute_notification(struct coap_client_request *req
 	payload = (uint8_t*)coap_packet_get_payload(response, &payload_len);
 	if (!payload_len) {
 		LOG_WRN("Received empty attributes");
-		return;
+		return payload_len;
 	}
 	LOG_HEXDUMP_DBG(payload, payload_len, "Received attributes");
 
 	err = thingsboard_attr_from_json(payload, payload_len, &attr);
 	if (err < 0) {
 		LOG_ERR("Parsing attributes failed");
-		return;
+		return err;
 	}
 
 #ifdef CONFIG_THINGSBOARD_FOTA
@@ -67,6 +64,7 @@ static void client_handle_attribute_notification(struct coap_client_request *req
 	if (attribute_cb) {
 		attribute_cb(&attr);
 	}
+	return 0;
 }
 
 /**
@@ -99,7 +97,8 @@ static int timestamp_from_buf(int64_t *value, const void *buf, size_t sz) {
 	return 0;
 }
 
-static void client_handle_time_response(struct coap_client_request *req, struct coap_packet *response)
+static int client_handle_time_response(struct coap_client_request *req,
+				       struct coap_packet *response)
 {
 	int64_t ts = 0;
 	const uint8_t *payload;
@@ -111,19 +110,20 @@ static void client_handle_time_response(struct coap_client_request *req, struct 
 	payload = coap_packet_get_payload(response, &payload_len);
 	if (!payload_len) {
 		LOG_WRN("Received empty timestamp");
-		return;
+		return payload_len;
 	}
 
 	err = timestamp_from_buf(&ts, payload, payload_len);
 	if (err) {
 		LOG_ERR("Parsing of time response failed");
-		return;
+		return err;
 	}
 
 	tb_time.tb_time = ts;
 	tb_time.own_time = k_uptime_get();
 
 	k_sem_give(&time_sem);
+	return 0;
 }
 
 static int client_subscribe_to_attributes(void)
@@ -190,24 +190,6 @@ static void time_worker(struct k_work *work) {
 	k_work_schedule(&work_time, K_MSEC(TIME_RETRY_INTERVAL));
 }
 
-static void modem_configure(void)
-{
-#if defined(CONFIG_LTE_LINK_CONTROL)
-	if (IS_ENABLED(CONFIG_LTE_AUTO_INIT_AND_CONNECT)) {
-		/* Do nothing, modem is already turned on
-		 * and connected.
-		 */
-	} else {
-		int err;
-
-		LOG_INF("LTE Link Connecting ...");
-		err = lte_lc_init_and_connect();
-		__ASSERT(err == 0, "LTE link could not be established.");
-		LOG_INF("LTE Link Connected!");
-	}
-#endif /* defined(CONFIG_LTE_LINK_CONTROL) */
-}
-
 int thingsboard_send_telemetry(const void *payload, size_t sz) {
 	int err;
 
@@ -219,38 +201,6 @@ int thingsboard_send_telemetry(const void *payload, size_t sz) {
 	}
 
 	return 0;
-}
-
-static void print_modem_info(void) {
-	char info_name[50];
-	char modem_info[50];
-
-	enum modem_info infos[] = {
-		MODEM_INFO_FW_VERSION,
-		MODEM_INFO_UICC,
-		MODEM_INFO_IMSI,
-		MODEM_INFO_ICCID,
-		MODEM_INFO_APN,
-		MODEM_INFO_IP_ADDRESS
-	};
-
-	int ret;
-
-	for (size_t i = 0; i < ARRAY_SIZE(infos); i++) {
-		ret = modem_info_string_get(infos[i],
-						modem_info,
-						sizeof(modem_info));
-		if (ret < 0) {
-			return;
-		}
-		ret = modem_info_name_get(infos[i],
-						info_name);
-		if (ret < 0 || ret > sizeof(info_name)) {
-			return;
-		}
-		info_name[ret] = '\0';
-		LOG_INF("Value of %s is %s", info_name, modem_info);
-	}
 }
 
 static void start_client(void);
@@ -274,20 +224,13 @@ static void prov_callback(const char *token) {
 
 static void start_client(void) {
 	int err;
-	char name[30];
 
 	LOG_INF("%s", __func__);
 
 	if (!access_token) {
 		LOG_INF("Access token missing, requesting provisioning");
 
-		err = modem_info_string_get(MODEM_INFO_ICCID, name, sizeof(name));
-		if (err < 0) {
-			LOG_ERR("Could not fetch ICCID");
-			return;
-		}
-
-		err = thingsboard_provision_device(name, prov_callback);
+		err = thingsboard_provision_device(current_fw->device_name, prov_callback);
 		if (err) {
 			LOG_ERR("Could not provision device");
 			return;
@@ -314,10 +257,6 @@ int thingsboard_init(attr_write_callback_t cb, const struct tb_fw_id *fw_id) {
 	int ret;
 
 	current_fw = fw_id;
-
-	modem_configure();
-
-	print_modem_info();
 
 	if (coap_client_init(start_client) != 0) {
 		LOG_ERR("Failed to initialize CoAP client");

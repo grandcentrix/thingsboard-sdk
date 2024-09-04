@@ -28,8 +28,8 @@ time_t thingsboard_time(void);
  * Same as thingsboard_time, but the return value is not truncated to
  * seconds. Please be aware that no special care is taken to guarantee
  * the accuracy of the time. Due to network latency, the time will
- * be off in the order of multiple seconds. 
-*/
+ * be off in the order of multiple seconds.
+ */
 time_t thingsboard_time_msec(void);
 
 /**
@@ -52,6 +52,9 @@ struct tb_fw_id {
 	 * FOTA page.
 	 */
 	const char *fw_version;
+
+	/** Name of your device. for example the ICCID of the SIM-Card. */
+	const char *device_name;
 };
 
 /**
