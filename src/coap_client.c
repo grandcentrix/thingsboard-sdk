@@ -342,10 +342,10 @@ static int client_handle_get_response(uint8_t *buf, int received, struct sockadd
 	}
 
 	/*
-	 * In a piggybacked response, message ID and token must match.
+	 * Handle responses (piggybacked and non-piggybacked)
 	 */
 	COAP_FOR_EACH_REQUEST_SAFE(r, rs) {
-		if (r->id == id && !memcmp(r->token, token, tkl)) {
+		if (!memcmp(r->token, token, tkl)) {
 			if (r->reply_handler) {
 				r->reply_handler(r, &response);
 			}
