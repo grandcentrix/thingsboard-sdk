@@ -312,8 +312,8 @@ static int client_handle_get_response(uint8_t *buf, int received, struct sockadd
 		 * RFC7252 5.3.2
 		 */
 		COAP_FOR_EACH_REQUEST_SAFE(r, rs) {
-			if (r->confirmable && r->id == id) {
-				r->confirmable = false;
+			if (r->confirmable && !r->confirmed && r->id == id) {
+				r->confirmed = true;
 				if (r->reply_handler) {
 					/*
 					 * We expect a reply -
