@@ -5,7 +5,7 @@ This module uses RPC calls to fetch the current time stamp from the server. You 
 
 > [!WARNING]
 > Consider this implementation experimental.
-> This library evolved from code written during a hackathon at grandcentrix where we wanted to explore and evaluate Thingsboards.
+> This library evolved from code written during a hackathon at grandcentrix where we wanted to explore and evaluate Thingsboard.
 > It is still under development and not intended to be used in a production environment (yet).
 
 ## Installation
