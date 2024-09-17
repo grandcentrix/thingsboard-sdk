@@ -3,6 +3,11 @@ This module is an SDK to interface a Zephyr-based project with an instance of ht
 
 This module uses RPC calls to fetch the current time stamp from the server. You have to implement this RPC call in your rule chain for this to work. An example implementation can be found when you import `root_rule_chain.json` into your Thingsboard tenant.
 
+> [!WARNING]
+> Consider this implementation experimental.
+> This library evolved from code written during a hackathon at grandcentrix where we wanted to explore and evaluate Thingsboards.
+> It is still under development and not intended to be used in a production environment (yet).
+
 ## Installation
 This is a Zephyr module, so just include it into your project's west.yml. It comes with the correct nRF SDK version included, so you need to use `import:true`.
 
