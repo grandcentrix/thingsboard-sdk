@@ -16,11 +16,11 @@ This is a Zephyr module, so just include it into your project's west.yml. It com
 manifest:
   remotes:
     - name: gcx
-      url-base: ssh://git@github.com/GCX-EMBEDDED
+      url-base: ssh://git@github.com/grandcentrix
   projects:
     - name: thingsboard-sdk
       remote: gcx
-      revision: v2.7.0
+      revision: main
       path: modules/thingsboard
       import: true
   self:
