@@ -43,6 +43,10 @@ Besides the typical Zephyr toolchain, this module comes with its own build-time 
 pip install -r thingsboard/scripts/requirements.txt
 ```
 
+The device tree for your board should define a [storage
+partition](https://docs.zephyrproject.org/latest/services/storage/flash_map/flash_map.html#relationship-with-devicetree)
+which is needed for non-volatile storage of the access token.
+
 ## Functionality
 
 Please make sure to have read and understood <https://thingsboard.io/docs/>.
