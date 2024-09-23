@@ -1,0 +1,27 @@
+name: lint
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  superlinter:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Full git history is needed to get a proper
+          # list of changed files within `super-linter`
+          fetch-depth: 0
+
+      - name: Run super-linter
+        uses: super-linter/super-linter/slim@v7.1.0
+        env:
+          DEFAULT_BRANCH: main
+          RUN_LOCAL: "true"
+          DEFAULT_WORKSPACE: $CI_PROJECT_DIR
+          LINTER_RULES_PATH: .github/config
+          VALIDATE_MARKDOWN: true
