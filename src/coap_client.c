@@ -277,6 +277,15 @@ static void response_code_to_str(int code, char str[5]) {
 	sprintf(str, "%1d.%02d", class, detail);
 }
 
+static char* message_type_strings[] = {"Confirmable", "Non-confirmable", "Acknowledgement", "Reset"};
+
+static char* message_type_to_str(uint8_t type) {
+	if (type < ARRAY_SIZE(message_type_strings)) {
+		return message_type_strings[type];
+	}
+	return "unknown";
+}
+
 
 static int client_handle_get_response(uint8_t *buf, int received, struct sockaddr *from)
 {
@@ -303,7 +312,7 @@ static int client_handle_get_response(uint8_t *buf, int received, struct sockadd
 
 
 	response_code_to_str(code, code_str);
-	LOG_INF("Received CoAP message: type %d, code %s, message id %d", type, code_str, id);
+	LOG_INF("Received CoAP message: type %s, code %s, message id %d", message_type_to_str(type), code_str, id);
 
 	if (type == COAP_TYPE_ACK && code == COAP_CODE_EMPTY) {
 		/*
