@@ -71,4 +71,8 @@ config COAP_SERVER_PORT
 	int "CoAP server port"
 	default 5683
 
+module = THINGSBOARD
+module-str = Thingsboard SDK
+source "subsys/logging/Kconfig.template.log_config"
+
 endif

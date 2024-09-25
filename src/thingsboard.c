@@ -11,7 +11,7 @@
 #include "provision.h"
 
 #include <zephyr/logging/log.h>
-LOG_MODULE_REGISTER(thingsboard_client);
+LOG_MODULE_REGISTER(thingsboard_client, CONFIG_THINGSBOARD_LOG_LEVEL);
 
 static struct {
 	int64_t tb_time; // actual Unix timestamp in ms

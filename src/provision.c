@@ -8,7 +8,7 @@
 #include <stdio.h>
 
 #include <zephyr/logging/log.h>
-LOG_MODULE_REGISTER(tb_provision);
+LOG_MODULE_REGISTER(tb_provision, CONFIG_THINGSBOARD_LOG_LEVEL);
 
 static token_callback token_cb;
 static char access_token[30];
