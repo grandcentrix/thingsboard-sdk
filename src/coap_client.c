@@ -323,6 +323,7 @@ static int client_handle_get_response(uint8_t *buf, int received, struct sockadd
 		COAP_FOR_EACH_REQUEST_SAFE(r, rs) {
 			if (r->confirmable && !r->confirmed && r->id == id) {
 				r->confirmed = true;
+				LOG_DBG("Received acknowledgement for request %p (message id %d)", r, r->id);
 				if (r->reply_handler) {
 					/*
 					 * We expect a reply -
@@ -355,6 +356,7 @@ static int client_handle_get_response(uint8_t *buf, int received, struct sockadd
 	 */
 	COAP_FOR_EACH_REQUEST_SAFE(r, rs) {
 		if (!memcmp(r->token, token, tkl)) {
+			LOG_DBG("Received response for request %p (message id %d)", r, r->id);
 			if (r->reply_handler) {
 				r->reply_handler(r, &response);
 			}
