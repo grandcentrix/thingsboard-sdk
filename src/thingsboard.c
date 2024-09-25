@@ -117,6 +117,7 @@ static int client_handle_time_response(struct coap_client_request *req,
 
 	tb_time.tb_time = ts;
 	tb_time.own_time = k_uptime_get();
+	LOG_DBG("Timestamp updated: %lld", ts);
 
 	/* schedule a refresh request for later. */
 	k_work_reschedule(&work_time, K_SECONDS(CONFIG_THINGSBOARD_TIME_REFRESH_INTERVAL_SECONDS));
