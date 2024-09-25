@@ -5,7 +5,7 @@
 #include <zephyr/random/random.h>
 
 #include <zephyr/logging/log.h>
-LOG_MODULE_REGISTER(coap_client);
+LOG_MODULE_REGISTER(coap_client, CONFIG_THINGSBOARD_LOG_LEVEL);
 
 #define APP_COAP_VERSION 1
 #define APP_RECEIVE_INTERVAL K_MSEC(100)
@@ -379,8 +379,6 @@ static void receive(void *buf, size_t len) {
 	int received;
 	struct sockaddr src = {0};
 	socklen_t socklen = sizeof(src);
-	char src_ip[NET_IPV4_ADDR_LEN];
-	char *res;
 
 	received = zsock_recvfrom(coap_socket, buf, len, MSG_DONTWAIT, (struct sockaddr*)&src, &socklen);
 	if (received < 0) {
@@ -396,10 +394,12 @@ static void receive(void *buf, size_t len) {
 		return;
 	}
 
-	if (Z_LOG_CONST_LEVEL_CHECK(LOG_LEVEL_DBG)) {
-		res = zsock_inet_ntop(src.sa_family, &src, src_ip, sizeof(src_ip));
-		LOG_DBG("Received from %s", res);
-	}
+	#ifdef CONFIG_THINGSBOARD_LOG_LEVEL_DBG
+	char src_ip[NET_IPV4_ADDR_LEN];
+	char *res;
+	res = zsock_inet_ntop(src.sa_family, &src, src_ip, sizeof(src_ip));
+	LOG_DBG("Received from %s", res);
+	#endif
 
 	LOG_HEXDUMP_DBG(buf, received, "Received");
 

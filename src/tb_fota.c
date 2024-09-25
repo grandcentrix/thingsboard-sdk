@@ -10,7 +10,7 @@
 #include <thingsboard_attr_parser.h>
 
 #include <zephyr/logging/log.h>
-LOG_MODULE_REGISTER(tb_fota);
+LOG_MODULE_REGISTER(tb_fota, CONFIG_THINGSBOARD_LOG_LEVEL);
 
 static const struct tb_fw_id *current_fw;
 static const char *access_token;
