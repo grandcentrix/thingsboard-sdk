@@ -49,11 +49,15 @@ config THINGSBOARD_USE_PROVISIONING
     depends on NVS
 	default y
 
+if THINGSBOARD_USE_PROVISIONING
+
 config THINGSBOARD_PROVISIONING_KEY
     string "Provisioning key"
 
 config THINGSBOARD_PROVISIONING_SECRET
     string "Provisioning secret"
+
+endif # THINGSBOARD_USE_PROVISIONING
 
 config THINGSBOARD_ACCESS_TOKEN
   string
@@ -82,4 +86,4 @@ module = THINGSBOARD
 module-str = Thingsboard SDK
 source "subsys/logging/Kconfig.template.log_config"
 
-endif
+endif # THINGSBOARD
