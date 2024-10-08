@@ -1,9 +1,11 @@
 menuconfig THINGSBOARD
     bool "Thingsboard library"
-    depends on COAP
+    depends on NETWORKING
+    depends on NET_IPV4
     depends on NET_SOCKETS
-    depends on NET_SOCKETS_POSIX_NAMES
     depends on JSON_LIBRARY
+    depends on COAP
+    select NET_SOCKETS_POSIX_NAMES
 
 if THINGSBOARD
 
@@ -41,6 +43,11 @@ config COAP_NUM_RETRIES
 
 config THINGSBOARD_USE_PROVISIONING
     bool "Provision devices"
+    depends on SETTINGS
+    depends on FLASH
+    depends on FLASH_MAP
+    depends on NVS
+	default y
 
 config THINGSBOARD_PROVISIONING_KEY
     string "Provisioning key"
