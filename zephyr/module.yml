@@ -1,3 +1,4 @@
+name: thingsboard-sdk
 build:
   cmake: .
   kconfig: Kconfig
