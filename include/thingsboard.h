@@ -12,7 +12,7 @@ struct thingsboard_attr;
  * received from the Thingsboard server.
  * For information on how the struct thingsboard_attr is defined,
  * see top-level CMakeLists.txt and scripts/gen_json_parser.py.
-*/
+ */
 typedef void (*attr_write_callback_t)(struct thingsboard_attr *attr);
 
 /**
@@ -21,7 +21,7 @@ typedef void (*attr_write_callback_t)(struct thingsboard_attr *attr);
  * rule chain supports it.
  * You can import the file root_rule_chain.json on your Thingsboard
  * instance to create a rule chain with the required D2C function.
-*/
+ */
 time_t thingsboard_time(void);
 
 /**
@@ -37,7 +37,7 @@ time_t thingsboard_time_msec(void);
  * See https://thingsboard.io/docs/user-guide/telemetry/ for details.
  * If you provide your own timestamp, be aware that Thingsboard expects
  * timestamps with millisecond-precision as provided by thingsboard_time_msec.
-*/
+ */
 int thingsboard_send_telemetry(const void *payload, size_t sz);
 
 struct tb_fw_id {

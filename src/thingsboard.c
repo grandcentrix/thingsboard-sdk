@@ -14,8 +14,8 @@
 LOG_MODULE_REGISTER(thingsboard_client, CONFIG_THINGSBOARD_LOG_LEVEL);
 
 static struct {
-	int64_t tb_time; // actual Unix timestamp in ms
-	int64_t own_time; // uptime when receiving timestamp in ms
+	int64_t tb_time;      // actual Unix timestamp in ms
+	int64_t own_time;     // uptime when receiving timestamp in ms
 	int64_t last_request; // uptime when time was last requested in ms
 } tb_time;
 
@@ -40,7 +40,7 @@ static int client_handle_attribute_notification(struct coap_client_request *req,
 
 	LOG_INF("%s", __func__);
 
-	payload = (uint8_t*)coap_packet_get_payload(response, &payload_len);
+	payload = (uint8_t *)coap_packet_get_payload(response, &payload_len);
 	if (!payload_len) {
 		LOG_WRN("Received empty attributes");
 		return payload_len;
@@ -76,7 +76,8 @@ static int client_handle_attribute_notification(struct coap_client_request *req,
  * - It does not take care of integer overflows
  * - The buffer must only contain valid digits
  */
-static int timestamp_from_buf(int64_t *value, const void *buf, size_t sz) {
+static int timestamp_from_buf(int64_t *value, const void *buf, size_t sz)
+{
 	int64_t result = 0;
 	size_t i;
 	const char *next;
@@ -164,7 +165,8 @@ static void client_request_time(struct k_work *work)
 	static const char *payload = "{\"method\": \"getCurrentTime\", \"params\": {}}";
 	const uint8_t *uri[] = {"api", "v1", access_token, "rpc", NULL};
 
-	err = coap_client_make_request(uri, payload, strlen(payload), COAP_TYPE_CON, COAP_METHOD_POST, client_handle_time_response);
+	err = coap_client_make_request(uri, payload, strlen(payload), COAP_TYPE_CON,
+				       COAP_METHOD_POST, client_handle_time_response);
 	if (err) {
 		LOG_ERR("Failed to request time");
 	}
@@ -175,7 +177,8 @@ static void client_request_time(struct k_work *work)
 	k_work_reschedule(k_work_delayable_from_work(work), K_SECONDS(10));
 }
 
-int thingsboard_send_telemetry(const void *payload, size_t sz) {
+int thingsboard_send_telemetry(const void *payload, size_t sz)
+{
 	int err;
 
 	const uint8_t *uri[] = {"api", "v1", access_token, "telemetry", NULL};
@@ -192,7 +195,8 @@ static void start_client(void);
 
 static const struct tb_fw_id *current_fw;
 
-static void prov_callback(const char *token) {
+static void prov_callback(const char *token)
+{
 	LOG_INF("Device provisioned");
 	access_token = token;
 
@@ -207,7 +211,8 @@ static void prov_callback(const char *token) {
 	start_client();
 }
 
-static void start_client(void) {
+static void start_client(void)
+{
 	int err;
 
 	LOG_INF("%s", __func__);
@@ -233,7 +238,8 @@ static void start_client(void) {
 	}
 }
 
-int thingsboard_init(attr_write_callback_t cb, const struct tb_fw_id *fw_id) {
+int thingsboard_init(attr_write_callback_t cb, const struct tb_fw_id *fw_id)
+{
 	attribute_cb = cb;
 	int ret;
 
@@ -255,11 +261,13 @@ int thingsboard_init(attr_write_callback_t cb, const struct tb_fw_id *fw_id) {
 	return 0;
 }
 
-time_t thingsboard_time(void) {
+time_t thingsboard_time(void)
+{
 	return thingsboard_time_msec() / MSEC_PER_SEC;
 }
 
-time_t thingsboard_time_msec(void) {
-	time_t result = (time_t) ((k_uptime_get() - tb_time.own_time) + tb_time.tb_time);
+time_t thingsboard_time_msec(void)
+{
+	time_t result = (time_t)((k_uptime_get() - tb_time.own_time) + tb_time.tb_time);
 	return result;
 }

@@ -24,4 +24,6 @@ jobs:
           RUN_LOCAL: "true"
           DEFAULT_WORKSPACE: $CI_PROJECT_DIR
           LINTER_RULES_PATH: .github/config
+          CLANG_FORMAT_FILE_NAME: ../../.clang-format
+          VALIDATE_CLANG_FORMAT: true
           VALIDATE_MARKDOWN: true
