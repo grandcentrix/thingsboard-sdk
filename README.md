@@ -82,6 +82,11 @@ port of the Thingsboard CoAP server, using `config COAP_CLIENT_NUM_MSGS` and `co
 CoAP reliability can be fine-tuned using `config COAP_NUM_RETRIES` and the Zephyr-internal `config
 COAP_INIT_ACK_TIMEOUT_MS`. Using NB-IoT, 15000 is a good starting value for the latter.
 
+### Device Profile
+
+The SDK currently only supports CoAP with JSON payload as transport type. This works with the default device profile of Thingsboard.
+If you create a custom device profile make sure to configure it accordingly.
+
 ### Sending telemetry to cloud
 
 ```c
@@ -95,7 +100,7 @@ int thingsboard_send_telemetry(const void *payload, size_t sz);
 ```
 
 As outlined in the [official Thingsboard documentation](https://thingsboard.io/docs/user-guide/telemetry/), by default,
-their telemetry endpoint expects a JSON string with values:
+their telemetry endpoint expects a JSON string with key-value pairs:
 
 ```json
 {
@@ -103,8 +108,6 @@ their telemetry endpoint expects a JSON string with values:
   "humidity": 70
 }
 ```
-
-You can also configure your device profile to expect protobuf or custom content encodings.
 
 You can include your own timestamp using the syntax documented by Thingsboard:
 
