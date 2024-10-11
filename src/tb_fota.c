@@ -16,7 +16,7 @@ static const struct tb_fw_id *current_fw;
 static const char *access_token;
 
 BUILD_ASSERT((CONFIG_THINGSBOARD_FOTA_CHUNK_SIZE + 100 < CONFIG_COAP_CLIENT_MSG_LEN),
-			"CoAP messages too small");
+	     "CoAP messages too small");
 
 static struct {
 	char title[30];
@@ -26,15 +26,18 @@ static struct {
 	uint8_t dfu_buf[1024];
 } tb_fota_ctx;
 
-static inline unsigned int fw_next_chunk(void) {
+static inline unsigned int fw_next_chunk(void)
+{
 	return tb_fota_ctx.offset / CONFIG_THINGSBOARD_FOTA_CHUNK_SIZE;
 }
 
-static inline unsigned int fw_num_chunks(void) {
+static inline unsigned int fw_num_chunks(void)
+{
 	return ceiling_fraction(tb_fota_ctx.size, CONFIG_THINGSBOARD_FOTA_CHUNK_SIZE);
 }
 
-static inline size_t fw_next_chunk_size(void) {
+static inline size_t fw_next_chunk_size(void)
+{
 	size_t rem = tb_fota_ctx.size - tb_fota_ctx.offset;
 	return MIN(rem, CONFIG_THINGSBOARD_FOTA_CHUNK_SIZE);
 }
@@ -49,7 +52,9 @@ enum thingsboard_fw_state {
 	TB_FW_NUM_STATES,
 };
 
-#define STATE(s) case TB_FW_ ## s: return #s
+#define STATE(s)                                                                                   \
+	case TB_FW_##s:                                                                            \
+		return #s
 static const char *state_str(enum thingsboard_fw_state state)
 {
 	switch (state) {
@@ -66,7 +71,8 @@ static const char *state_str(enum thingsboard_fw_state state)
 }
 #undef STATE
 
-static int client_set_fw_state(enum thingsboard_fw_state state) {
+static int client_set_fw_state(enum thingsboard_fw_state state)
+{
 	char tele[30];
 	int err;
 	static enum thingsboard_fw_state current_state = TB_FW_NUM_STATES;
@@ -86,7 +92,8 @@ static int client_set_fw_state(enum thingsboard_fw_state state) {
 
 static int client_fw_get_next_chunk(void);
 
-static int fw_apply(void) {
+static int fw_apply(void)
+{
 	int err;
 
 	err = dfu_target_mcuboot_done(true);
@@ -102,7 +109,8 @@ static int fw_apply(void) {
 	return 0;
 }
 
-static enum thingsboard_fw_state fw_chunk_process(const void *buf, size_t size) {
+static enum thingsboard_fw_state fw_chunk_process(const void *buf, size_t size)
+{
 	int err;
 
 	if (size != fw_next_chunk_size()) {
@@ -112,7 +120,7 @@ static enum thingsboard_fw_state fw_chunk_process(const void *buf, size_t size) 
 
 	if (fw_next_chunk() == 0) {
 		// First chunk, check if data is valid
-		if(!dfu_target_mcuboot_identify(buf)) {
+		if (!dfu_target_mcuboot_identify(buf)) {
 			LOG_ERR("Data received is not a valid MCUBoot package, abort");
 			tb_fota_ctx.size = 0;
 			return TB_FW_FAILED;
@@ -154,11 +162,11 @@ static int client_handle_fw_chunk(struct coap_client_request *req, struct coap_p
 		LOG_ERR("Failed to report state");
 	}
 
-
 	switch (state) {
 	case TB_FW_DOWNLOADING:
 		if (fw_next_chunk() % 10 == 0) {
-			err = snprintf(progress_tele, sizeof(progress_tele), "{\"fw_progress\": %zu}", tb_fota_ctx.offset);
+			err = snprintf(progress_tele, sizeof(progress_tele),
+				       "{\"fw_progress\": %zu}", tb_fota_ctx.offset);
 			if (err > 0 && (size_t)err < sizeof(progress_tele)) {
 				thingsboard_send_telemetry(progress_tele, err);
 			} else {
@@ -175,7 +183,8 @@ static int client_handle_fw_chunk(struct coap_client_request *req, struct coap_p
 	}
 }
 
-static int client_fw_get_next_chunk(void) {
+static int client_fw_get_next_chunk(void)
+{
 	int err;
 	unsigned int chunk = fw_next_chunk();
 	struct coap_client_request *request;
@@ -206,7 +215,8 @@ static int client_fw_get_next_chunk(void) {
 	if (err) {
 		return err;
 	}
-	err = coap_packet_append_uri_query_d(&request->pkt, "size=%d", CONFIG_THINGSBOARD_FOTA_CHUNK_SIZE);
+	err = coap_packet_append_uri_query_d(&request->pkt, "size=%d",
+					     CONFIG_THINGSBOARD_FOTA_CHUNK_SIZE);
 	if (err) {
 		return err;
 	}
@@ -220,9 +230,10 @@ static int client_fw_get_next_chunk(void) {
 	return 0;
 }
 
-int confirm_fw_update(void) {
-	static const char fw_state[] =
-		"{\"fw_state\": \"UPDATED\",\"current_fw_title\": \"%s\",\"current_fw_version\": \"%s\"}";
+int confirm_fw_update(void)
+{
+	static const char fw_state[] = "{\"fw_state\": \"UPDATED\",\"current_fw_title\": "
+				       "\"%s\",\"current_fw_version\": \"%s\"}";
 	static char dst[sizeof(tb_fota_ctx) + sizeof(fw_state) + 20];
 	int err;
 
@@ -240,7 +251,7 @@ int confirm_fw_update(void) {
 	}
 
 	err = snprintf(dst, sizeof(dst), fw_state, current_fw->fw_title, current_fw->fw_version);
-	if (err < 0 || (size_t) err >= sizeof(dst)) {
+	if (err < 0 || (size_t)err >= sizeof(dst)) {
 		LOG_ERR("FW info does not fit");
 		return -ENOMEM;
 	}
@@ -248,7 +259,8 @@ int confirm_fw_update(void) {
 	return thingsboard_send_telemetry(dst, err);
 }
 
-static int thingsboard_start_fw_update(void) {
+static int thingsboard_start_fw_update(void)
+{
 	int err;
 
 	LOG_INF("Starting FW update process");
@@ -257,7 +269,8 @@ static int thingsboard_start_fw_update(void) {
 		LOG_ERR("No FW set");
 	}
 
-	if (!strcmp(tb_fota_ctx.title, current_fw->fw_title) && !strcmp(tb_fota_ctx.version, current_fw->fw_version)) {
+	if (!strcmp(tb_fota_ctx.title, current_fw->fw_title) &&
+	    !strcmp(tb_fota_ctx.version, current_fw->fw_version)) {
 		LOG_INF("Skipping FW update, requested FW already installed");
 		return -EALREADY;
 	}
@@ -296,12 +309,14 @@ static int thingsboard_start_fw_update(void) {
 	return client_fw_get_next_chunk();
 }
 
-void thingsboard_fota_init(const char *_access_token, const struct tb_fw_id *_current_fw) {
+void thingsboard_fota_init(const char *_access_token, const struct tb_fw_id *_current_fw)
+{
 	access_token = _access_token;
 	current_fw = _current_fw;
 }
 
-void thingsboard_check_fw_attributes(struct thingsboard_attr *attr) {
+void thingsboard_check_fw_attributes(struct thingsboard_attr *attr)
+{
 	if (!(attr->fw_title_parsed && attr->fw_version_parsed && attr->fw_size_parsed)) {
 		LOG_WRN("Attr did not contain all attributes necessary for FW update");
 		return;

@@ -7,7 +7,7 @@
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(coap_client, CONFIG_THINGSBOARD_LOG_LEVEL);
 
-#define APP_COAP_VERSION 1
+#define APP_COAP_VERSION     1
 #define APP_RECEIVE_INTERVAL K_MSEC(100)
 
 static int coap_socket;
@@ -16,18 +16,19 @@ static uint16_t next_token;
 
 static struct sockaddr_storage server;
 
-#define SLAB_SIZE (sizeof(struct coap_client_request) + CONFIG_COAP_CLIENT_MSG_LEN)
-#define SLAB_ALIGN (__alignof__ (struct coap_client_request))
+#define SLAB_SIZE  (sizeof(struct coap_client_request) + CONFIG_COAP_CLIENT_MSG_LEN)
+#define SLAB_ALIGN (__alignof__(struct coap_client_request))
 
 /* Use +1 to always allow receive to allocate a block */
-K_MEM_SLAB_DEFINE(coap_msg_slab, SLAB_SIZE, CONFIG_COAP_CLIENT_NUM_MSGS+1, SLAB_ALIGN);
+K_MEM_SLAB_DEFINE(coap_msg_slab, SLAB_SIZE, CONFIG_COAP_CLIENT_NUM_MSGS + 1, SLAB_ALIGN);
 
 static sys_dlist_t requests;
 
-#define COAP_FOR_EACH_REQUEST_SAFE(r, rs) SYS_DLIST_FOR_EACH_CONTAINER_SAFE(&requests, (r), (rs), node)
+#define COAP_FOR_EACH_REQUEST_SAFE(r, rs)                                                          \
+	SYS_DLIST_FOR_EACH_CONTAINER_SAFE(&requests, (r), (rs), node)
 #define COAP_FOR_EACH_REQUEST(r) SYS_DLIST_FOR_EACH_CONTAINER(&requests, (r), node)
 
-static void on_work(struct k_work* work);
+static void on_work(struct k_work *work);
 K_WORK_DELAYABLE_DEFINE(work_coap, on_work);
 
 static enum coap_client_state {
@@ -38,20 +39,23 @@ static enum coap_client_state {
 
 static void (*active_cb)(void);
 
-#define STATE(s) case COAP_CLIENT_ ## s: return #s
+#define STATE(s)                                                                                   \
+	case COAP_CLIENT_##s:                                                                      \
+		return #s
 static const char *state_str(enum coap_client_state state)
 {
 	switch (state) {
-	STATE(DISCONNECTED);
-	STATE(ACTIVE);
-	STATE(ERROR);
+		STATE(DISCONNECTED);
+		STATE(ACTIVE);
+		STATE(ERROR);
 	}
 
 	return "INVALID STATE";
 }
 #undef STATE
 
-static void client_state_set(enum coap_client_state state) {
+static void client_state_set(enum coap_client_state state)
+{
 	if (c_state == state) {
 		return;
 	}
@@ -65,7 +69,8 @@ static void client_state_set(enum coap_client_state state) {
 	}
 }
 
-static void coap_client_request_free(struct coap_client_request *req) {
+static void coap_client_request_free(struct coap_client_request *req)
+{
 	void *block = req;
 	if (sys_dnode_is_linked(&req->node)) {
 		sys_dlist_remove(&req->node);
@@ -73,7 +78,8 @@ static void coap_client_request_free(struct coap_client_request *req) {
 	k_mem_slab_free(&coap_msg_slab, block);
 }
 
-struct coap_client_request *coap_client_request_alloc(uint8_t type, uint8_t code) {
+struct coap_client_request *coap_client_request_alloc(uint8_t type, uint8_t code)
+{
 	void *block = NULL;
 	uint8_t *data;
 	uint16_t datalen;
@@ -82,13 +88,14 @@ struct coap_client_request *coap_client_request_alloc(uint8_t type, uint8_t code
 
 	err = k_mem_slab_alloc(&coap_msg_slab, &block, K_NO_WAIT);
 	if (err < 0) {
-		LOG_ERR("Could not allocate memory for request, error (%d): %s", err, strerror(-err));
+		LOG_ERR("Could not allocate memory for request, error (%d): %s", err,
+			strerror(-err));
 		return NULL;
 	}
 
 	req = (struct coap_client_request *)block;
 	*req = (struct coap_client_request){0};
-	data = (uint8_t*)block + sizeof(*req);
+	data = (uint8_t *)block + sizeof(*req);
 	datalen = SLAB_SIZE - sizeof(*req);
 
 	req->confirmable = type == COAP_TYPE_CON;
@@ -98,7 +105,8 @@ struct coap_client_request *coap_client_request_alloc(uint8_t type, uint8_t code
 	memcpy(req->token, &next_token, req->tkl);
 
 	req->id = coap_next_id();
-	err = coap_packet_init(&req->pkt, data, datalen, APP_COAP_VERSION, type, req->tkl, req->token, code, req->id);
+	err = coap_packet_init(&req->pkt, data, datalen, APP_COAP_VERSION, type, req->tkl,
+			       req->token, code, req->id);
 	if (err < 0) {
 		coap_client_request_free(req);
 		return NULL;
@@ -109,7 +117,8 @@ struct coap_client_request *coap_client_request_alloc(uint8_t type, uint8_t code
 	return req;
 }
 
-int coap_client_request_observe(struct coap_client_request *req) {
+int coap_client_request_observe(struct coap_client_request *req)
+{
 	int err;
 
 	req->observation = true;
@@ -121,8 +130,10 @@ int coap_client_request_observe(struct coap_client_request *req) {
 	return 0;
 }
 
-static int send_raw(void *buf, size_t len) {
-	if (sendto(coap_socket, buf, len, 0, (struct sockaddr*)&server, sizeof(struct sockaddr_in)) < 0) {
+static int send_raw(void *buf, size_t len)
+{
+	if (sendto(coap_socket, buf, len, 0, (struct sockaddr *)&server,
+		   sizeof(struct sockaddr_in)) < 0) {
 		LOG_ERR("Failed to send, error (%d): %s", errno, strerror(errno));
 		return -errno;
 	}
@@ -130,7 +141,8 @@ static int send_raw(void *buf, size_t len) {
 	return 0;
 }
 
-static int client_send_request(struct coap_client_request *req) {
+static int client_send_request(struct coap_client_request *req)
+{
 	int err;
 
 	LOG_INF("Sending %s request %p (message id %d), %u retries left",
@@ -155,7 +167,8 @@ static struct coap_client_request *coap_request_next_to_expire(int64_t *next_exp
 	struct coap_client_request *found = NULL, *p;
 	int64_t expiry, min_expiry = 0;
 
-	COAP_FOR_EACH_REQUEST(p) {
+	COAP_FOR_EACH_REQUEST(p)
+	{
 		if (!p->t0) {
 			continue;
 		}
@@ -173,7 +186,8 @@ static struct coap_client_request *coap_request_next_to_expire(int64_t *next_exp
 	return found;
 }
 
-int coap_client_send(struct coap_client_request *req, coap_reply_handler_t reply) {
+int coap_client_send(struct coap_client_request *req, coap_reply_handler_t reply)
+{
 	LOG_HEXDUMP_DBG(req->pkt.data, req->pkt.offset, "sending coap packet");
 	int err;
 
@@ -192,7 +206,9 @@ int coap_client_send(struct coap_client_request *req, coap_reply_handler_t reply
 	return 0;
 }
 
-int coap_client_make_request(const uint8_t** uri, const void *payload, size_t plen, uint8_t type, uint8_t code, coap_reply_handler_t reply) {
+int coap_client_make_request(const uint8_t **uri, const void *payload, size_t plen, uint8_t type,
+			     uint8_t code, coap_reply_handler_t reply)
+{
 	int err;
 	struct coap_client_request *req;
 
@@ -210,7 +226,8 @@ int coap_client_make_request(const uint8_t** uri, const void *payload, size_t pl
 	if (payload && plen) {
 		err = coap_packet_append_payload_marker(&req->pkt);
 		if (err) {
-			LOG_ERR("Could not append payload marker, error (%d): %s", err, strerror(-err));
+			LOG_ERR("Could not append payload marker, error (%d): %s", err,
+				strerror(-err));
 			goto cleanup;
 		}
 
@@ -228,17 +245,16 @@ cleanup:
 	return err;
 }
 
-static int client_ack_message(struct coap_packet *response) {
+static int client_ack_message(struct coap_packet *response)
+{
 	struct coap_packet ack;
 	uint8_t ack_buf[4];
 	uint16_t msg_id;
 	int err;
 
 	msg_id = coap_header_get_id(response);
-	err = coap_packet_init(&ack, ack_buf, sizeof(ack_buf),
-			APP_COAP_VERSION, COAP_TYPE_ACK,
-			0, NULL,
-			0, msg_id);
+	err = coap_packet_init(&ack, ack_buf, sizeof(ack_buf), APP_COAP_VERSION, COAP_TYPE_ACK, 0,
+			       NULL, 0, msg_id);
 	if (err) {
 		LOG_ERR("Could not initialize ack, error (%d): %s", err, strerror(-err));
 		return err;
@@ -247,17 +263,16 @@ static int client_ack_message(struct coap_packet *response) {
 	return send_raw(ack.data, ack.offset);
 }
 
-static int client_reset_message(struct coap_packet *response) {
+static int client_reset_message(struct coap_packet *response)
+{
 	struct coap_packet reset;
 	uint8_t buf[4];
 	uint16_t msg_id;
 	int err;
 
 	msg_id = coap_header_get_id(response);
-	err = coap_packet_init(&reset, buf, sizeof(buf),
-			APP_COAP_VERSION, COAP_TYPE_RESET,
-			0, NULL,
-			0, msg_id);
+	err = coap_packet_init(&reset, buf, sizeof(buf), APP_COAP_VERSION, COAP_TYPE_RESET, 0, NULL,
+			       0, msg_id);
 	if (err) {
 		LOG_ERR("Could not initialize reset, error (%d): %s", err, strerror(-err));
 		return err;
@@ -266,26 +281,29 @@ static int client_reset_message(struct coap_packet *response) {
 	return send_raw(reset.data, reset.offset);
 }
 
-static void decode_response_code(int code, int *class, int *detail) {
+static void decode_response_code(int code, int *class, int *detail)
+{
 	*class = (code >> 5);
 	*detail = code & 0x1f;
 }
 
-static void response_code_to_str(int code, char str[5]) {
+static void response_code_to_str(int code, char str[5])
+{
 	int class, detail;
 	decode_response_code(code, &class, &detail);
 	sprintf(str, "%1d.%02d", class, detail);
 }
 
-static char* message_type_strings[] = {"Confirmable", "Non-confirmable", "Acknowledgement", "Reset"};
+static char *message_type_strings[] = {"Confirmable", "Non-confirmable", "Acknowledgement",
+				       "Reset"};
 
-static char* message_type_to_str(uint8_t type) {
+static char *message_type_to_str(uint8_t type)
+{
 	if (type < ARRAY_SIZE(message_type_strings)) {
 		return message_type_strings[type];
 	}
 	return "unknown";
 }
-
 
 static int client_handle_get_response(uint8_t *buf, int received, struct sockaddr *from)
 {
@@ -310,9 +328,9 @@ static int client_handle_get_response(uint8_t *buf, int received, struct sockadd
 	id = coap_header_get_id(&response);
 	tkl = coap_header_get_token(&response, token);
 
-
 	response_code_to_str(code, code_str);
-	LOG_INF("Received CoAP message: type %s, code %s, message id %d", message_type_to_str(type), code_str, id);
+	LOG_INF("Received CoAP message: type %s, code %s, message id %d", message_type_to_str(type),
+		code_str, id);
 
 	if (type == COAP_TYPE_ACK && code == COAP_CODE_EMPTY) {
 		/*
@@ -320,10 +338,12 @@ static int client_handle_get_response(uint8_t *buf, int received, struct sockadd
 		 * to the original request by the message ID.
 		 * RFC7252 5.3.2
 		 */
-		COAP_FOR_EACH_REQUEST_SAFE(r, rs) {
+		COAP_FOR_EACH_REQUEST_SAFE(r, rs)
+		{
 			if (r->confirmable && !r->confirmed && r->id == id) {
 				r->confirmed = true;
-				LOG_DBG("Received acknowledgement for request %p (message id %d)", r, r->id);
+				LOG_DBG("Received acknowledgement for request %p (message id %d)",
+					r, r->id);
 				if (r->reply_handler) {
 					/*
 					 * We expect a reply -
@@ -354,7 +374,8 @@ static int client_handle_get_response(uint8_t *buf, int received, struct sockadd
 	/*
 	 * Handle responses (piggybacked and non-piggybacked)
 	 */
-	COAP_FOR_EACH_REQUEST_SAFE(r, rs) {
+	COAP_FOR_EACH_REQUEST_SAFE(r, rs)
+	{
 		if (!memcmp(r->token, token, tkl)) {
 			LOG_DBG("Received response for request %p (message id %d)", r, r->id);
 			if (r->reply_handler) {
@@ -372,7 +393,7 @@ static int client_handle_get_response(uint8_t *buf, int received, struct sockadd
 				r->t0 = 0;
 			}
 
-			if(type == COAP_TYPE_CON) {
+			if (type == COAP_TYPE_CON) {
 				return client_ack_message(&response);
 			}
 			return 0;
@@ -384,14 +405,16 @@ static int client_handle_get_response(uint8_t *buf, int received, struct sockadd
 	return client_reset_message(&response);
 }
 
-static void receive(void *buf, size_t len) {
+static void receive(void *buf, size_t len)
+{
 
 	int err;
 	int received;
 	struct sockaddr src = {0};
 	socklen_t socklen = sizeof(src);
 
-	received = zsock_recvfrom(coap_socket, buf, len, MSG_DONTWAIT, (struct sockaddr*)&src, &socklen);
+	received = zsock_recvfrom(coap_socket, buf, len, MSG_DONTWAIT, (struct sockaddr *)&src,
+				  &socklen);
 	if (received < 0) {
 		if (errno == EAGAIN || errno == EWOULDBLOCK) {
 			return;
@@ -405,12 +428,12 @@ static void receive(void *buf, size_t len) {
 		return;
 	}
 
-	#ifdef CONFIG_THINGSBOARD_LOG_LEVEL_DBG
+#ifdef CONFIG_THINGSBOARD_LOG_LEVEL_DBG
 	char src_ip[NET_IPV4_ADDR_LEN];
 	char *res;
 	res = zsock_inet_ntop(src.sa_family, &src, src_ip, sizeof(src_ip));
 	LOG_DBG("Received from %s", res);
-	#endif
+#endif
 
 	LOG_HEXDUMP_DBG(buf, received, "Received");
 
@@ -425,10 +448,7 @@ static int server_resolve(void)
 {
 	int err;
 	struct addrinfo *result;
-	struct addrinfo hints = {
-		.ai_family = AF_INET,
-		.ai_socktype = SOCK_DGRAM
-	};
+	struct addrinfo hints = {.ai_family = AF_INET, .ai_socktype = SOCK_DGRAM};
 	char ipv4_addr[NET_IPV4_ADDR_LEN];
 
 	err = getaddrinfo(CONFIG_COAP_SERVER_HOSTNAME, NULL, &hints, &result);
@@ -445,13 +465,11 @@ static int server_resolve(void)
 	/* IPv4 Address. */
 	struct sockaddr_in *server4 = ((struct sockaddr_in *)&server);
 
-	server4->sin_addr.s_addr =
-		((struct sockaddr_in *)result->ai_addr)->sin_addr.s_addr;
+	server4->sin_addr.s_addr = ((struct sockaddr_in *)result->ai_addr)->sin_addr.s_addr;
 	server4->sin_family = AF_INET;
 	server4->sin_port = htons(CONFIG_COAP_SERVER_PORT);
 
-	inet_ntop(AF_INET, &server4->sin_addr.s_addr, ipv4_addr,
-		  sizeof(ipv4_addr));
+	inet_ntop(AF_INET, &server4->sin_addr.s_addr, ipv4_addr, sizeof(ipv4_addr));
 	LOG_INF("IPv4 Address found %s", ipv4_addr);
 
 	/* Free the address. */
@@ -460,7 +478,8 @@ static int server_resolve(void)
 	return 0;
 }
 
-static int udp_setup(void) {
+static int udp_setup(void)
+{
 	int err;
 	struct sockaddr_in src = {0};
 
@@ -497,7 +516,8 @@ static int udp_setup(void) {
 	return 0;
 }
 
-static int udp_teardown(void) {
+static int udp_teardown(void)
+{
 	int err;
 	struct coap_client_request *r, *rs;
 
@@ -507,7 +527,8 @@ static int udp_teardown(void) {
 		return err;
 	}
 
-	COAP_FOR_EACH_REQUEST_SAFE(r, rs) {
+	COAP_FOR_EACH_REQUEST_SAFE(r, rs)
+	{
 		coap_client_request_free(r);
 	}
 
@@ -519,7 +540,8 @@ static int udp_teardown(void) {
 /**
  * Check all pending requests.
  */
-static int client_cycle_requests(void) {
+static int client_cycle_requests(void)
+{
 	struct coap_client_request *req;
 	int64_t next_expiry;
 	int64_t next_sched = INT64_MAX;
@@ -577,14 +599,16 @@ static int client_cycle_requests(void) {
 	return 0;
 }
 
-static int client_active(void) {
+static int client_active(void)
+{
 	static uint8_t rx_buf[CONFIG_COAP_CLIENT_MSG_LEN];
 	receive(rx_buf, sizeof(rx_buf));
 
 	return client_cycle_requests();
 }
 
-static void on_work(struct k_work* work) {
+static void on_work(struct k_work *work)
+{
 	ARG_UNUSED(work);
 
 	int err;
@@ -620,7 +644,8 @@ static void on_work(struct k_work* work) {
 }
 
 #if CONFIG_COAP_CLIENT_STAT_INTERVAL_SECONDS > 0
-static void statistics(struct k_work *work) {
+static void statistics(struct k_work *work)
+{
 	uint32_t mem_free;
 
 	mem_free = k_mem_slab_num_free_get(&coap_msg_slab);
@@ -673,9 +698,7 @@ int coap_packet_append_uri_path(struct coap_packet *pkt, const uint8_t **uri)
 	int err;
 
 	while (*uri) {
-		err = coap_packet_append_option(pkt, COAP_OPTION_URI_PATH,
-						*uri,
-						strlen(*uri));
+		err = coap_packet_append_option(pkt, COAP_OPTION_URI_PATH, *uri, strlen(*uri));
 		if (err < 0) {
 			return err;
 		}
@@ -685,7 +708,8 @@ int coap_packet_append_uri_path(struct coap_packet *pkt, const uint8_t **uri)
 	return 0;
 }
 
-int coap_packet_append_uri_query_s(struct coap_packet *pkt, const char *fmt, const char *s) {
+int coap_packet_append_uri_query_s(struct coap_packet *pkt, const char *fmt, const char *s)
+{
 	char query[50];
 	int err;
 
@@ -697,7 +721,8 @@ int coap_packet_append_uri_query_s(struct coap_packet *pkt, const char *fmt, con
 	return coap_packet_append_option(pkt, COAP_OPTION_URI_QUERY, query, err);
 }
 
-int coap_packet_append_uri_query_d(struct coap_packet *pkt, const char *fmt, int d) {
+int coap_packet_append_uri_query_d(struct coap_packet *pkt, const char *fmt, int d)
+{
 	char query[20];
 	int err;
 
