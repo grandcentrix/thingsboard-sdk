@@ -281,16 +281,16 @@ static int client_reset_message(struct coap_packet *response)
 	return send_raw(reset.data, reset.offset);
 }
 
-static void decode_response_code(int code, int *class, int *detail)
+void coap_decode_response_code(int code, int *class, int *detail)
 {
 	*class = (code >> 5);
 	*detail = code & 0x1f;
 }
 
-static void response_code_to_str(int code, char str[5])
+void coap_response_code_to_str(int code, char str[5])
 {
 	int class, detail;
-	decode_response_code(code, &class, &detail);
+	coap_decode_response_code(code, &class, &detail);
 	sprintf(str, "%1d.%02d", class, detail);
 }
 
@@ -328,7 +328,7 @@ static int client_handle_get_response(uint8_t *buf, int received, struct sockadd
 	id = coap_header_get_id(&response);
 	tkl = coap_header_get_token(&response, token);
 
-	response_code_to_str(code, code_str);
+	coap_response_code_to_str(code, code_str);
 	LOG_INF("Received CoAP message: type %s, code %s, message id %d", message_type_to_str(type),
 		code_str, id);
 
