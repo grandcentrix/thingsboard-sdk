@@ -70,4 +70,14 @@ int coap_packet_append_uri_query_s(struct coap_packet *pkt, const char *fmt, con
  */
 int coap_packet_append_uri_query_d(struct coap_packet *pkt, const char *fmt, int d);
 
+/**
+ * Decode a response code into its components class and detail.
+ */
+void coap_decode_response_code(int code, int *class, int *detail);
+
+/**
+ * Convert a response code to its string representation (like "2.01").
+ */
+void coap_response_code_to_str(int code, char str[5]);
+
 #endif /* COAP_CLIENT_H */
