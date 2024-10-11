@@ -6,10 +6,10 @@ static const struct json_obj_descr example_desc[] = {
 	JSON_OBJ_DESCR_PRIM(struct example, status, JSON_TOK_STRING),
 	JSON_OBJ_DESCR_PRIM(struct example, credentialsType, JSON_TOK_STRING),
 	JSON_OBJ_DESCR_PRIM(struct example, credentialsValue, JSON_TOK_STRING),
-	JSON_OBJ_DESCR_PRIM(struct example, extra_value, JSON_TOK_STRING)
-};
+	JSON_OBJ_DESCR_PRIM(struct example, extra_value, JSON_TOK_STRING)};
 
-int example_from_json(void *json, size_t len, struct example *v) {
+int example_from_json(void *json, size_t len, struct example *v)
+{
 	int ret;
 
 	ret = json_obj_parse(json, len, example_desc, ARRAY_SIZE(example_desc), v);

@@ -139,14 +139,16 @@ struct {self.name} {{
             child_descr
             + f"""\
 static const struct json_obj_descr {self.name}_desc[] = {{
-	{delim.join([d.make_descriptor() for d in self.properties])}
-}};\
+	{delim.join([d.make_descriptor() for d in self.properties])}}};\
 """
         )
 
     def make_indices(self):
+
+        max_length = max(len(x.index_define_name()) for x in self.properties)
+
         def index(i, prop):
-            return f"#define {prop.index_define_name()} {i}"
+            return f"#define {prop.index_define_name(): <{max_length}} {i}"
 
         return "\n".join(index(*t) for t in enumerate(self.properties))
 
@@ -181,7 +183,8 @@ def define_parser(prop):
 	}}
 """
 
-    return f"""{declare_parser(prop)} {{
+    return f"""{declare_parser(prop)}
+{{
 	int ret;
 
 	ret = json_obj_parse(json, len, {prop.name}_desc, ARRAY_SIZE({prop.name}_desc), v);
@@ -216,7 +219,8 @@ def write_header(path, prop):
 
 {declare_parser(prop)};
 
-#endif /* {guard} */"""
+#endif /* {guard} */
+"""
         )
 
 
