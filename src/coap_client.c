@@ -236,6 +236,14 @@ int coap_client_make_request(const uint8_t **uri, const void *payload, size_t pl
 			LOG_ERR("Failed to append payload, error (%d): %s", err, strerror(-err));
 			goto cleanup;
 		}
+
+		err = coap_append_option_int(&req->pkt, COAP_OPTION_CONTENT_FORMAT,
+					     COAP_CONTENT_FORMAT_APP_JSON);
+		if (err < 0) {
+			LOG_ERR("Failed to append content format option, error (%d): %s", err,
+				strerror(-err));
+			goto cleanup;
+		}
 	}
 
 	return coap_client_send(req, reply);
