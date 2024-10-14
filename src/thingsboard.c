@@ -100,13 +100,25 @@ static int client_handle_time_response(struct coap_client_request *req,
 	int64_t ts = 0;
 	const uint8_t *payload;
 	uint16_t payload_len;
+	uint8_t code;
+	char code_str[5];
+	char expected_code_str[5];
 	int err;
 
 	LOG_INF("%s", __func__);
 
+	code = coap_header_get_code(response);
+	if (code != COAP_RESPONSE_CODE_CONTENT) {
+		coap_response_code_to_str(code, code_str);
+		coap_response_code_to_str(COAP_RESPONSE_CODE_CONTENT, expected_code_str);
+		LOG_ERR("Unexpected response code for timestamp request: got %s, expected %s",
+			code_str, expected_code_str);
+		return -1;
+	}
+
 	payload = coap_packet_get_payload(response, &payload_len);
 	if (!payload_len) {
-		LOG_WRN("Received empty timestamp");
+		LOG_ERR("Received empty timestamp");
 		return payload_len;
 	}
 
