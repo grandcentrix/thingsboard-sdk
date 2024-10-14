@@ -291,7 +291,8 @@ void coap_response_code_to_str(int code, char str[5])
 {
 	int class, detail;
 	coap_decode_response_code(code, &class, &detail);
-	sprintf(str, "%1d.%02d", class, detail);
+	// class: 1 digit, detail: 2 digits
+	sprintf(str, "%c.%02d", '0' + class, detail);
 }
 
 static char *message_type_strings[] = {"Confirmable", "Non-confirmable", "Acknowledgement",
