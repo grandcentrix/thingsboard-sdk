@@ -14,13 +14,6 @@ config THINGSBOARD_FOTA
     depends on DFU_TARGET_MCUBOOT
     default y if DFU_TARGET_MCUBOOT
 
-config APP_MCUBOOT_FLASH_BUF_SZ
-    int "Size of buffer used for flash write operations during MCUboot updates"
-    depends on DFU_TARGET_MCUBOOT
-    default 4096
-    help
-      Buffer size must be aligned to the minimal flash write block size.
-
 config COAP_CLIENT_NUM_MSGS
     int "Maximum number of CoAP messages"
     default 10
