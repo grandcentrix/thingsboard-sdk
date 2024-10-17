@@ -40,6 +40,7 @@ config THINGSBOARD_USE_PROVISIONING
 config THINGSBOARD_FOTA
     bool "Thingsboard FOTA support"
     depends on DFU_TARGET_MCUBOOT
+    depends on REBOOT
 
 if THINGSBOARD_FOTA
 
