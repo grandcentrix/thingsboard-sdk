@@ -33,7 +33,7 @@ static inline unsigned int fw_next_chunk(void)
 
 static inline unsigned int fw_num_chunks(void)
 {
-	return ceiling_fraction(tb_fota_ctx.size, CONFIG_THINGSBOARD_FOTA_CHUNK_SIZE);
+	return DIV_ROUND_UP(tb_fota_ctx.size, CONFIG_THINGSBOARD_FOTA_CHUNK_SIZE);
 }
 
 static inline size_t fw_next_chunk_size(void)
