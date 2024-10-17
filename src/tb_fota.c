@@ -4,8 +4,8 @@
 #include "coap_client.h"
 #include "thingsboard.h"
 #include <zephyr/sys/reboot.h>
+#include <zephyr/dfu/mcuboot.h>
 #include <stdio.h>
-#include <dfu/mcuboot.h>
 #include <dfu/dfu_target_mcuboot.h>
 #include <thingsboard_attr_parser.h>
 
