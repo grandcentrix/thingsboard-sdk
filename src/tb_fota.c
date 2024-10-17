@@ -293,7 +293,7 @@ static int thingsboard_start_fw_update(void)
 	}
 
 	// Callback argument is not used by DFU-MCUboot
-	err = dfu_target_mcuboot_init(tb_fota_ctx.size, NULL);
+	err = dfu_target_mcuboot_init(tb_fota_ctx.size, 0, NULL);
 	if (err < 0) {
 		LOG_ERR("Failed: dfu_target_mcuboot_init");
 		return err;
