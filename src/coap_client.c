@@ -646,7 +646,7 @@ static void on_work(struct k_work *work)
 		client_state_set(COAP_CLIENT_ERROR);
 	}
 
-	err = k_work_schedule(&work_coap, APP_RECEIVE_INTERVAL);
+	err = k_work_reschedule(&work_coap, APP_RECEIVE_INTERVAL);
 	if (err < 0) {
 		LOG_ERR("Failed to schedule receiver, error (%d): %s", err, strerror(-err));
 	}
