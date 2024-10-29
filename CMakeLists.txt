@@ -30,6 +30,9 @@ if(CONFIG_THINGSBOARD)
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     )
 
+    add_custom_target(attr_parser DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/generated/thingsboard_attr_parser.h)
+    add_dependencies(thingsboard attr_parser)
+
     zephyr_library_sources(
         src/coap_client.c
         src/thingsboard.c
