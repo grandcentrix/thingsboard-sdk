@@ -1,0 +1,37 @@
+name: Build Samples
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    container: ghcr.io/nrfconnect/sdk-nrf-toolchain:v2.7.0
+    defaults:
+      run:
+        # Bash is needed to set toolchain related environment variables in docker container
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          path: thingsboard
+
+      - name: Initialize
+        run: |
+          west init -l thingsboard
+          west update -o=--depth=1 -n
+
+      - name: Install Python Dependencies
+        run: pip install -r thingsboard/scripts/requirements.txt
+
+      - name: Build Telemetry Sample
+        run: |
+          west build --pristine -b nrf9160dk/nrf9160/ns thingsboard/samples/telemetry
+
+      - name: Build Attributes Sample
+        run: |
+          west build --pristine -b nrf9160dk/nrf9160/ns thingsboard/samples/attributes
