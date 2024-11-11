@@ -4,7 +4,7 @@ manifest:
 
   remotes:
     - name: github
-      url-base: https://github.com/
+      url-base: https://github.com
 
   projects:
     - name: nrf
