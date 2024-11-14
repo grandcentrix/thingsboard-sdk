@@ -1,9 +1,11 @@
 #include "thingsboard.h"
 
 #include <string.h>
+#include <stdio.h>
 
 #include <zephyr/kernel.h>
 #include <zephyr/net/coap.h>
+#include <zephyr/net/http/client.h>
 #include <thingsboard_attr_parser.h>
 
 #include "coap_client.h"
@@ -19,9 +21,17 @@ static struct {
 	int64_t last_request; // uptime when time was last requested in ms
 } tb_time;
 
+#define RPC_PARAMS_SIZE  256
+#define RPC_PAYLOAD_SIZE 512
+
 K_SEM_DEFINE(time_sem, 0, 1);
+K_SEM_DEFINE(rpc_sem, 0, 1);
+
+static void rcp_reset(struct k_timer *timer_id);
+K_TIMER_DEFINE(rcp_timer, rcp_reset, NULL);
 
 static attr_write_callback_t attribute_cb;
+static rpc_callback_t rpc_cb;
 
 static void client_request_time(struct k_work *work);
 K_WORK_DELAYABLE_DEFINE(work_time, client_request_time);
@@ -189,6 +199,83 @@ static void client_request_time(struct k_work *work)
 	k_work_reschedule(k_work_delayable_from_work(work), K_SECONDS(10));
 }
 
+static int client_handle_rpc_response(struct coap_client_request *req, struct coap_packet *response)
+{
+	const uint8_t *payload;
+	uint16_t payload_len;
+	uint8_t code;
+	char code_str[5];
+	char expected_code_str[5];
+
+	LOG_INF("%s", __func__);
+
+	code = coap_header_get_code(response);
+	if (code != COAP_RESPONSE_CODE_CONTENT) {
+		coap_response_code_to_str(code, code_str);
+		coap_response_code_to_str(COAP_RESPONSE_CODE_CONTENT, expected_code_str);
+		LOG_ERR("Unexpected response code for RPC request: got %s, expected %s", code_str,
+			expected_code_str);
+		k_sem_give(&rpc_sem);
+		return -1;
+	}
+
+	payload = coap_packet_get_payload(response, &payload_len);
+	if (!payload_len) {
+		LOG_ERR("Received an empty RCP response");
+		k_sem_give(&rpc_sem);
+		return payload_len;
+	}
+
+	if (rpc_cb) {
+		rpc_cb(payload, payload_len);
+	}
+
+	k_sem_give(&rpc_sem);
+
+	return 0;
+}
+
+static void rcp_reset(struct k_timer *timer_id)
+{
+	k_sem_give(&rpc_sem);
+}
+
+int thingsboard_rpc(const char *method, rpc_callback_t cb, ...)
+{
+	int err;
+	va_list param;
+	char params[RPC_PARAMS_SIZE];
+	char payload[RPC_PAYLOAD_SIZE];
+
+	if (method == NULL || strlen(method) == 0) {
+		LOG_ERR("method name must not be 'NULL' or empty");
+		return -EINVAL;
+	}
+
+	va_start(param, cb);
+	bool params_exist = vsnprintf(params, sizeof(params), "%s", param) > 0 ? true : false;
+	if (!params_exist) {
+		strcpy(params, "{}");
+	}
+	va_end(param);
+
+	k_sem_take(&rpc_sem, K_FOREVER);
+	k_timer_start(&rcp_timer, K_MSEC(CONFIG_THINGSBOARD_RPC_TIMEOUT), K_NO_WAIT);
+
+	snprintf(payload, sizeof(payload), "{\"method\":\"%s\", \"params\": %s}", method, params);
+	const uint8_t *uri[] = {"api", "v1", access_token, "rpc", NULL};
+
+	err = coap_client_make_request(uri, payload, strlen(payload), COAP_TYPE_CON,
+				       COAP_METHOD_POST, client_handle_rpc_response);
+	if (err) {
+		LOG_ERR("Failed to perform RPC");
+		return err;
+	}
+	rpc_cb = cb;
+
+	return 0;
+}
+
 int thingsboard_send_telemetry(const void *payload, size_t sz)
 {
 	int err;
@@ -256,6 +343,8 @@ int thingsboard_init(attr_write_callback_t cb, const struct tb_fw_id *fw_id)
 	int ret;
 
 	current_fw = fw_id;
+
+	k_sem_give(&rpc_sem);
 
 	ret = coap_client_init(start_client);
 	if (ret != 0) {
