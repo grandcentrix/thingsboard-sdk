@@ -104,38 +104,14 @@ static int timestamp_from_buf(int64_t *value, const void *buf, size_t sz)
 	return 0;
 }
 
-static int client_handle_time_response(struct coap_client_request *req,
-				       struct coap_packet *response)
+void client_handle_time_response(const uint8_t *data, size_t len)
 {
 	int64_t ts = 0;
-	const uint8_t *payload;
-	uint16_t payload_len;
-	uint8_t code;
-	char code_str[5];
-	char expected_code_str[5];
-	int err;
 
-	LOG_INF("%s", __func__);
-
-	code = coap_header_get_code(response);
-	if (code != COAP_RESPONSE_CODE_CONTENT) {
-		coap_response_code_to_str(code, code_str);
-		coap_response_code_to_str(COAP_RESPONSE_CODE_CONTENT, expected_code_str);
-		LOG_ERR("Unexpected response code for timestamp request: got %s, expected %s",
-			code_str, expected_code_str);
-		return -1;
-	}
-
-	payload = coap_packet_get_payload(response, &payload_len);
-	if (!payload_len) {
-		LOG_ERR("Received empty timestamp");
-		return payload_len;
-	}
-
-	err = timestamp_from_buf(&ts, payload, payload_len);
+	int err = timestamp_from_buf(&ts, data, len);
 	if (err) {
 		LOG_ERR("Parsing of time response failed");
-		return err;
+		return;
 	}
 
 	tb_time.tb_time = ts;
@@ -146,7 +122,7 @@ static int client_handle_time_response(struct coap_client_request *req,
 	k_work_reschedule(&work_time, K_SECONDS(CONFIG_THINGSBOARD_TIME_REFRESH_INTERVAL_SECONDS));
 
 	k_sem_give(&time_sem);
-	return 0;
+	return;
 }
 
 static int client_subscribe_to_attributes(void)
@@ -184,11 +160,7 @@ static void client_request_time(struct k_work *work)
 {
 	int err;
 
-	static const char *payload = "{\"method\": \"getCurrentTime\", \"params\": {}}";
-	const uint8_t *uri[] = {"api", "v1", access_token, "rpc", NULL};
-
-	err = coap_client_make_request(uri, payload, strlen(payload), COAP_TYPE_CON,
-				       COAP_METHOD_POST, client_handle_time_response);
+	err = thingsboard_rpc("getCurrentTime", client_handle_time_response);
 	if (err) {
 		LOG_ERR("Failed to request time");
 	}
