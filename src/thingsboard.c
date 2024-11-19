@@ -160,7 +160,7 @@ static void client_request_time(struct k_work *work)
 {
 	int err;
 
-	err = thingsboard_rpc("getCurrentTime", client_handle_time_response);
+	err = thingsboard_rpc("getCurrentTime", client_handle_time_response, NULL);
 	if (err) {
 		LOG_ERR("Failed to request time");
 	}
