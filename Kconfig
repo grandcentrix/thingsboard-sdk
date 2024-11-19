@@ -74,6 +74,12 @@ config THINGSBOARD_FOTA_CHUNK_SIZE
     help
        "Must be smaller than COAP_CLIENT_MSG_LEN"
 
+config THINGSBOARD_RPC_TIMEOUT
+    int "Time to wait for an RPC call in ms"
+    default 5000
+    help
+       "If no answer was received, this tells how long to wait before accepting the next call"
+
 config COAP_SERVER_HOSTNAME
   string "Coap Server hostname"
   default "10.101.45.222"

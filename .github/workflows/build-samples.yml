@@ -35,3 +35,7 @@ jobs:
       - name: Build Attributes Sample
         run: |
           west build --pristine -b nrf9160dk/nrf9160/ns thingsboard/samples/attributes
+
+      - name: Build RPC Sample
+        run: |
+          west build --pristine -b nrf9160dk/nrf9160/ns thingsboard/samples/rpc

@@ -40,6 +40,20 @@ time_t thingsboard_time_msec(void);
  */
 int thingsboard_send_telemetry(const void *payload, size_t sz);
 
+/**
+ * This callback will be called when the response for an RPC call
+ * was received from the Thingsboard server.
+ */
+typedef void (*rpc_callback_t)(const uint8_t *data, size_t len);
+
+/**
+ * Send RPC call.
+ * 'method' is required, a callback in case the call returns data, too.
+ * Parameters are an optional string in JSON format as the variadic arguments
+ * See https://thingsboard.io/docs/reference/coap-api/#client-side-rpc for details.
+ */
+int thingsboard_rpc(const char *method, rpc_callback_t cb, const char *params);
+
 struct tb_fw_id {
 	/** Title of your firmware, e.g. <project>-prod. This
 	 * must match to what you configure on your thingsboard

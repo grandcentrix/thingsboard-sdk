@@ -202,8 +202,7 @@ interpret the values in the actual field value, the contents are undefined.
 
 ### RPC calls - device to cloud
 
-This functionality is implemented, but not exposed in a general fashion. The module uses this functionality to get the
-current time from the server.
+This functionality is implemented, users can perform RPC calls with `thingsboard_rpc` function.
 
 ### RPC calls - cloud to device
 
