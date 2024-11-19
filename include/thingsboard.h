@@ -52,7 +52,7 @@ typedef void (*rpc_callback_t)(const uint8_t *data, size_t len);
  * Parameters are an optional string in JSON format as the variadic arguments
  * See https://thingsboard.io/docs/reference/coap-api/#client-side-rpc for details.
  */
-int thingsboard_rpc(const char *method, rpc_callback_t cb, ...);
+int thingsboard_rpc(const char *method, rpc_callback_t cb, const char *params);
 
 struct tb_fw_id {
 	/** Title of your firmware, e.g. <project>-prod. This

@@ -212,29 +212,26 @@ static void rcp_reset(struct k_timer *timer_id)
 	k_sem_give(&rpc_sem);
 }
 
-int thingsboard_rpc(const char *method, rpc_callback_t cb, ...)
+int thingsboard_rpc(const char *method, rpc_callback_t cb, const char* params)
 {
 	int err;
-	va_list param;
-	char params[RPC_PARAMS_SIZE];
-	char payload[RPC_PAYLOAD_SIZE];
+	char payload[RPC_PAYLOAD_SIZE] = {0};
 
 	if (method == NULL || strlen(method) == 0) {
 		LOG_ERR("method name must not be 'NULL' or empty");
 		return -EINVAL;
 	}
 
-	va_start(param, cb);
-	bool params_exist = vsnprintf(params, sizeof(params), "%s", param) > 0 ? true : false;
+	bool params_exist = (params != NULL && strlen(params) > 0) ? true : false;
 	if (!params_exist) {
-		strcpy(params, "{}");
+		params = "{}";
 	}
-	va_end(param);
 
 	k_sem_take(&rpc_sem, K_FOREVER);
 	k_timer_start(&rcp_timer, K_MSEC(CONFIG_THINGSBOARD_RPC_TIMEOUT), K_NO_WAIT);
 
 	snprintf(payload, sizeof(payload), "{\"method\":\"%s\", \"params\": %s}", method, params);
+
 	const uint8_t *uri[] = {"api", "v1", access_token, "rpc", NULL};
 
 	err = coap_client_make_request(uri, payload, strlen(payload), COAP_TYPE_CON,
@@ -243,6 +240,7 @@ int thingsboard_rpc(const char *method, rpc_callback_t cb, ...)
 		LOG_ERR("Failed to perform RPC");
 		return err;
 	}
+
 	rpc_cb = cb;
 
 	return 0;
@@ -312,6 +310,9 @@ static void start_client(void)
 int thingsboard_init(attr_write_callback_t cb, const struct tb_fw_id *fw_id)
 {
 	attribute_cb = cb;
+	if (attribute_cb) {
+		return 0;
+	}
 	int ret;
 
 	current_fw = fw_id;
