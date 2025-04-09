@@ -597,6 +597,10 @@ static int client_cycle_requests(void)
 			req->timeout = req->timeout << 1;
 			req->retries--;
 
+			if (req->confirmed) {
+				continue;
+			}
+
 			LOG_INF("Retrying request %p", req);
 		}
 
