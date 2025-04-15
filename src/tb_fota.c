@@ -36,7 +36,7 @@ static inline unsigned int fw_next_chunk(void)
 
 static inline unsigned int fw_num_chunks(void)
 {
-	return ceiling_fraction(tb_fota_ctx.size, CONFIG_THINGSBOARD_FOTA_CHUNK_SIZE);
+	return DIV_ROUND_UP(tb_fota_ctx.size, CONFIG_THINGSBOARD_FOTA_CHUNK_SIZE);
 }
 
 static inline size_t fw_next_chunk_size(void)
@@ -107,6 +107,7 @@ static int fw_apply(void)
 	k_sleep(K_SECONDS(5));
 	client_set_fw_state(TB_FW_UPDATING);
 	k_sleep(K_SECONDS(5));
+	dfu_target_mcuboot_schedule_update(0);
 	sys_reboot(SYS_REBOOT_COLD);
 
 	return 0;
@@ -296,7 +297,7 @@ static int thingsboard_start_fw_update(void)
 	}
 
 	// Callback argument is not used by DFU-MCUboot
-	err = dfu_target_mcuboot_init(tb_fota_ctx.size, NULL);
+	err = dfu_target_mcuboot_init(tb_fota_ctx.size, 0, NULL);
 	if (err < 0) {
 		LOG_ERR("Failed: dfu_target_mcuboot_init");
 		return err;
