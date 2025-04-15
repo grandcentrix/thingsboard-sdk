@@ -1,10 +1,11 @@
-#include "coap_client.h"
-
 #include <stdio.h>
+
+#include <zephyr/logging/log.h>
 #include <zephyr/net/socket.h>
 #include <zephyr/random/random.h>
 
-#include <zephyr/logging/log.h>
+#include "coap_client.h"
+
 LOG_MODULE_REGISTER(coap_client, CONFIG_THINGSBOARD_LOG_LEVEL);
 
 #define APP_COAP_VERSION     1

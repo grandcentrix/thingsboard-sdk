@@ -1,15 +1,18 @@
 #include "tb_fota.h"
 
-#include <zephyr/kernel.h>
-#include "coap_client.h"
-#include "thingsboard.h"
-#include <zephyr/sys/reboot.h>
 #include <stdio.h>
-#include <dfu/mcuboot.h>
+
+#include <zephyr/dfu/mcuboot.h>
+#include <zephyr/kernel.h>
+#include <zephyr/logging/log.h>
+#include <zephyr/sys/reboot.h>
 #include <dfu/dfu_target_mcuboot.h>
+
 #include <thingsboard_attr_parser.h>
 
-#include <zephyr/logging/log.h>
+#include "coap_client.h"
+#include "thingsboard.h"
+
 LOG_MODULE_REGISTER(tb_fota, CONFIG_THINGSBOARD_LOG_LEVEL);
 
 static const struct tb_fw_id *current_fw;

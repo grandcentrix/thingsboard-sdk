@@ -3,14 +3,15 @@
 #include <string.h>
 
 #include <zephyr/kernel.h>
+#include <zephyr/logging/log.h>
 #include <zephyr/net/coap.h>
+
 #include <thingsboard_attr_parser.h>
 
 #include "coap_client.h"
 #include "tb_fota.h"
 #include "provision.h"
 
-#include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(thingsboard_client, CONFIG_THINGSBOARD_LOG_LEVEL);
 
 static struct {

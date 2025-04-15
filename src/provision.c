@@ -1,13 +1,13 @@
-#include "provision.h"
-
-#include <zephyr/settings/settings.h>
-
-#include "coap_client.h"
-#include <provision_response_parser.h>
-
 #include <stdio.h>
 
 #include <zephyr/logging/log.h>
+#include <zephyr/settings/settings.h>
+
+#include <provision_response_parser.h>
+
+#include "coap_client.h"
+#include "provision.h"
+
 LOG_MODULE_REGISTER(tb_provision, CONFIG_THINGSBOARD_LOG_LEVEL);
 
 static token_callback token_cb;
