@@ -54,8 +54,6 @@ static int client_handle_prov_resp(struct coap_client_request *req, struct coap_
 	int err;
 	size_t tkl;
 
-	LOG_INF("%s", __func__);
-
 	payload = (uint8_t *)coap_packet_get_payload(response, &payload_len);
 	if (!payload_len) {
 		LOG_WRN("Received empty provisioning response");
@@ -128,8 +126,6 @@ static int make_provisioning_request(const char *device_name)
 	if (err < 0 || err >= sizeof(request)) {
 		return -ENOMEM;
 	}
-
-	LOG_INF("%s", __func__);
 
 	err = coap_client_make_request(uri, request, err, COAP_TYPE_CON, COAP_METHOD_POST,
 				       client_handle_prov_resp);

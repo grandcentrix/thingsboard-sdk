@@ -189,7 +189,7 @@ static int client_fw_get_next_chunk(void)
 	unsigned int chunk = fw_next_chunk();
 	struct coap_client_request *request;
 
-	LOG_INF("Requesting chunk %u of %u", chunk, fw_num_chunks());
+	LOG_DBG("Requesting chunk %u of %u", chunk, fw_num_chunks());
 
 	request = coap_client_request_alloc(COAP_TYPE_CON, COAP_METHOD_GET);
 	if (!request) {

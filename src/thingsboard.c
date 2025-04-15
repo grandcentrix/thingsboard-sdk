@@ -31,14 +31,10 @@ static const char *access_token;
 static int client_handle_attribute_notification(struct coap_client_request *req,
 						struct coap_packet *response)
 {
-	LOG_INF("%s", __func__);
-
 	uint8_t *payload;
 	uint16_t payload_len;
 	struct thingsboard_attr attr = {0};
 	int err;
-
-	LOG_INF("%s", __func__);
 
 	payload = (uint8_t *)coap_packet_get_payload(response, &payload_len);
 	if (!payload_len) {
@@ -105,8 +101,6 @@ static int client_handle_time_response(struct coap_client_request *req,
 	char expected_code_str[5];
 	int err;
 
-	LOG_INF("%s", __func__);
-
 	code = coap_header_get_code(response);
 	if (code != COAP_RESPONSE_CODE_CONTENT) {
 		coap_response_code_to_str(code, code_str);
@@ -165,7 +159,7 @@ static int client_subscribe_to_attributes(void)
 		return err;
 	}
 
-	LOG_INF("Attributes subscription request sent");
+	LOG_DBG("Attributes subscription request sent");
 
 	return 0;
 }
@@ -226,8 +220,6 @@ static void prov_callback(const char *token)
 static void start_client(void)
 {
 	int err;
-
-	LOG_INF("%s", __func__);
 
 	if (!access_token) {
 		LOG_INF("No access token in storage. Requesting provisioning.");

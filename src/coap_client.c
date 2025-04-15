@@ -60,7 +60,7 @@ static void client_state_set(enum coap_client_state state)
 		return;
 	}
 
-	LOG_INF("CoAP client changed from state %s to %s", state_str(c_state), state_str(state));
+	LOG_DBG("CoAP client changed from state %s to %s", state_str(c_state), state_str(state));
 
 	c_state = state;
 
@@ -145,7 +145,7 @@ static int client_send_request(struct coap_client_request *req)
 {
 	int err;
 
-	LOG_INF("Sending %s request %p (message id %d), %u retries left",
+	LOG_DBG("Sending %s request %p (message id %d), %u retries left",
 		req->confirmable ? "confirmable" : "non-confirmable", req, req->id, req->retries);
 
 	err = send_raw(req->pkt.data, req->pkt.offset);
@@ -338,7 +338,7 @@ static int client_handle_get_response(uint8_t *buf, int received, struct sockadd
 	tkl = coap_header_get_token(&response, token);
 
 	coap_response_code_to_str(code, code_str);
-	LOG_INF("Received CoAP message: type %s, code %s, message id %d", message_type_to_str(type),
+	LOG_DBG("Received CoAP message: type %s, code %s, message id %d", message_type_to_str(type),
 		code_str, id);
 
 	if (type == COAP_TYPE_ACK && code == COAP_CODE_EMPTY) {
@@ -487,7 +487,7 @@ static int server_resolve(void)
 	server4->sin_port = htons(CONFIG_COAP_SERVER_PORT);
 
 	zsock_inet_ntop(AF_INET, &server4->sin_addr.s_addr, ipv4_addr, sizeof(ipv4_addr));
-	LOG_INF("IPv4 Address found %s", ipv4_addr);
+	LOG_DBG("IPv4 Address found %s", ipv4_addr);
 
 	/* Free the address. */
 	zsock_freeaddrinfo(result);
@@ -601,7 +601,7 @@ static int client_cycle_requests(void)
 				continue;
 			}
 
-			LOG_INF("Retrying request %p", req);
+			LOG_DBG("Retrying request %p", req);
 		}
 
 		err = client_send_request(req);
@@ -671,7 +671,7 @@ static void statistics(struct k_work *work)
 
 	mem_free = k_mem_slab_num_free_get(&coap_msg_slab);
 
-	LOG_INF("CoAP stats: free: %u requests", mem_free);
+	LOG_DBG("CoAP stats: free: %u requests", mem_free);
 
 	k_work_schedule(k_work_delayable_from_work(work),
 			K_SECONDS(CONFIG_COAP_CLIENT_STAT_INTERVAL_SECONDS));
